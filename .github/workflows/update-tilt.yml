@@ -1,0 +1,34 @@
+name: Update tilt scores
+
+on:
+  schedule:
+    # 21:45 UTC = 5:45pm EDT / 4:45pm EST — after the close year-round.
+    # GitHub cron is UTC and doesn't follow US daylight saving.
+    - cron: "45 21 * * 1-5"
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write         # needed to commit the refreshed tilt.json
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Script is stdlib-only; nothing to pip install.
+      - name: Fetch tilt scores
+        run: python fetch_tilt.py
+
+      - name: Commit updated tilt.json
+        run: |
+          git config user.name "tilt-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add tilt.json
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Tilt scores $(date -u +%F)"
+          git push

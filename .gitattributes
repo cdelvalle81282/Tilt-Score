@@ -1,0 +1,5 @@
+# Normalize all text to LF in the repo. The GitHub Action regenerates
+# tilt.json with LF on Linux; without this, Windows CRLF commits would show
+# the whole file as changed every run.
+* text=auto eol=lf
+*.png binary

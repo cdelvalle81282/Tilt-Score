@@ -1,0 +1,12 @@
+# Local working notes — not for the public Pages repo
+CLAUDE.md
+PLAN.md
+MEMORY.md
+GOTCHA.md
+
+# Redundant handoff bundle (source is now unpacked in the tree)
+tilt-repo.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
