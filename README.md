@@ -3,11 +3,17 @@
 0DTE / nearest-expiration call/put tilt for 17 tickers, refreshed **every 15
 minutes during market hours**. Data from Cboe delayed quotes.
 
-Tilt scores the **nearest** expiration for each name, keeping the same-day
-(0DTE) expiry (this is a 0DTE/1DTE service, so the near expiry is the point).
-Any expiry trading under `VOLUME_FLOOR` (1,000 contracts) is skipped to the
-next real one, so a dead near-dated expiry (e.g. a 40-contract Wednesday)
-never prints a noisy score.
+The page shows two views, toggled at the top:
+
+- **Whole chain** (default): calls / total across all expirations — a standard
+  put/call read.
+- **Near-term (0DTE/1DTE)**: the nearest expiration, keeping the same-day 0DTE,
+  skipping any expiry under `VOLUME_FLOOR` (1,000 contracts) so a dead near-dated
+  expiry (e.g. a 40-contract Wednesday) never prints a noisy score.
+
+The **Spread** column (`near − chain`) shows how far the near-term skews from
+the whole chain — e.g. XLF's near-term can be call-heavy while its whole chain
+is put-heavy.
 
 **How it runs (current):** a job on the ops droplet runs `fetch_tilt.py` every
 15 minutes during market hours and serves the result at
