@@ -114,26 +114,41 @@ def fetch_symbol(sym: str) -> dict | None:
         bucket = by_exp.setdefault(exp, [0, 0])
         bucket[0 if cp == "C" else 1] += v
 
-    # Nearest expiry: same-day (0DTE) included unless EXPIRY_AFTER_TODAY.
-    live = sorted(e for e in by_exp if (e > today if EXPIRY_AFTER_TODAY else e >= today))
-    if not live:
+    if not by_exp:
         return None
-    # Roll past dead expiries (e.g. GOOGL's ~40-contract Wednesday) to the first
-    # one clearing the floor; if none qualifies, take the heaviest we have.
+
+    # Whole chain: every expiration summed (matches a standard put/call read).
+    calls_all = sum(c for c, _ in by_exp.values())
+    puts_all = sum(p for _, p in by_exp.values())
+    total_all = calls_all + puts_all
+    if total_all == 0:
+        return None
+
+    # Near-term: nearest expiry, same-day (0DTE) included unless EXPIRY_AFTER_TODAY,
+    # rolling past dead expiries (e.g. GOOGL's ~40-contract Wednesday) to the first
+    # clearing the floor; if none qualifies, take the heaviest upcoming one.
+    live = sorted(e for e in by_exp if (e > today if EXPIRY_AFTER_TODAY else e >= today))
     front = next((e for e in live if sum(by_exp[e]) >= VOLUME_FLOOR), None)
-    if front is None:
+    if front is None and live:
         front = max(live, key=lambda e: sum(by_exp[e]))
-    calls, puts = by_exp[front]
-    total = calls + puts
+    if front:
+        cn, pn = by_exp[front]
+        tn = cn + pn
+        near = {"calls": cn, "puts": pn, "total": tn,
+                "tilt": round(cn / tn * 100, 1) if tn else None}
+        expiry = f"20{front[:2]}-{front[2:4]}-{front[4:]}"
+    else:
+        near = {"calls": 0, "puts": 0, "total": 0, "tilt": None}
+        expiry = None
+
     return {
         "symbol": sym,
-        "expiry": f"20{front[:2]}-{front[2:4]}-{front[4:]}",
-        "calls": calls,
-        "puts": puts,
-        "total": total,
-        "tilt": round(calls / total * 100, 1) if total else None,
         "spot": data.get("current_price"),
         "spot_change_pct": data.get("price_change_percent"),
+        "expiry": expiry,
+        "near": near,
+        "chain": {"calls": calls_all, "puts": puts_all, "total": total_all,
+                  "tilt": round(calls_all / total_all * 100, 1)},
     }
 
 
@@ -157,18 +172,19 @@ def main() -> int:
         rows.append(row)
 
         hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
-        if row["tilt"] is not None:
-            hist.append({"date": today, "tilt": row["tilt"], "total": row["total"]})
+        hist.append({"date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"]})
         prior_history[sym] = hist[-HISTORY_KEEP:]
 
-        # Day-over-day change if we have a previous date.
+        # Day-over-day change per view, if we have a previous date.
         prev = [h for h in prior_history[sym] if h["date"] != today]
-        row["tilt_prev"] = prev[-1]["tilt"] if prev else None
-        print(f"  {sym}: tilt {row['tilt']}  ({row['calls']:,}C / {row['puts']:,}P)")
+        p = prev[-1] if prev else {}
+        row["near"]["tilt_prev"] = p.get("near", p.get("tilt"))   # old entries stored "tilt"
+        row["chain"]["tilt_prev"] = p.get("chain")
+        print(f"  {sym}: near {row['near']['tilt']} / chain {row['chain']['tilt']}")
 
     out = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": "Cboe delayed quotes, nearest expiration incl. same-day 0DTE (15-min delay; intraday values are partial-day)",
+        "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations",
         "rows": rows,
         "failed": failed,
         "history": prior_history,

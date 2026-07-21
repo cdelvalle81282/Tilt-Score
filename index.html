@@ -42,8 +42,19 @@
     text-transform: uppercase;
   }
   .stamp { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--ink-soft); }
-  .sub { color: var(--ink); font-size: 16.5px; line-height: 1.5; max-width: 62ch; margin-bottom: 22px; }
+  .sub { color: var(--ink); font-size: 16.5px; line-height: 1.5; max-width: 62ch; margin-bottom: 14px; }
   .sub b.c { color: var(--calls); } .sub b.p { color: var(--puts); }
+
+  .toggle { display: inline-flex; margin-bottom: 22px; border: 1.5px solid var(--rule); border-radius: 999px; overflow: hidden; }
+  .toggle button {
+    font-family: "Archivo", sans-serif; font-weight: 700; font-stretch: 84%;
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 7px 17px; border: 0; background: var(--panel); color: var(--ink-soft);
+    cursor: pointer; white-space: nowrap;
+  }
+  .toggle button.on { background: var(--ink); color: #fff; }
+  .toggle button:not(.on):hover { color: var(--ink); }
+  td.spread { font-weight: 600; font-size: 13.5px; width: 62px; }
 
   table { width: 100%; border-collapse: collapse; background: var(--panel); }
   th, td { padding: 10px; font-size: 14.5px; }
@@ -115,8 +126,13 @@
     <h1>Tilt Score</h1>
     <span class="stamp" id="stamp" style="margin-left:auto">loading…</span>
   </header>
-  <p class="sub">Tilt Score is the ratio of <b class="c">calls</b> to total option volume on
-  each name's nearest expiration (its 0DTE, or the next one out). 50 is dead even.</p>
+  <p class="sub">Tilt Score is the ratio of <b class="c">calls</b> to total option volume. Toggle
+  between the whole chain (all expirations) and the near-term expiry (its 0DTE, or the next one
+  out); <b>Spread</b> is how far the near-term skews from the whole chain. 50 is dead even.</p>
+  <div class="toggle" id="toggle">
+    <button data-view="chain" class="on">Whole chain</button>
+    <button data-view="near">Near-term · 0DTE/1DTE</button>
+  </div>
 
   <table>
     <thead><tr>
@@ -128,6 +144,7 @@
         <div class="scale-words"><span class="pw">◀ Put-tilted</span><span class="cw">Call-tilted ▶</span></div>
         <div class="scale-nums"><span class="n0">0</span><span class="n50">50</span><span class="n100">100</span></div>
       </th>
+      <th data-k="spread" class="delta" title="Near-term tilt minus whole-chain tilt">Spread</th>
       <th data-k="tilt_prev" class="delta dcol" title="Change in tilt vs the prior day">Δ 1d</th>
       <th data-k="calls" class="hide-sm">Calls</th>
       <th data-k="puts" class="hide-sm">Puts</th>
@@ -141,34 +158,58 @@
 <script>
 /* Snapshot baked in at build time; used when tilt.json isn't reachable
    (e.g. opening this file directly, or previewing as an artifact). */
-const FALLBACK = {"generated": "2026-07-21T17:27:04+00:00", "source": "Cboe delayed quotes, nearest expiration incl. same-day 0DTE (15-min delay; intraday values are partial-day)", "rows": [{"symbol": "AAPL", "expiry": "2026-07-22", "calls": 292168, "puts": 188220, "total": 480388, "tilt": 60.8, "spot": 328.545, "spot_change_pct": 0.5986, "tilt_prev": 52.7}, {"symbol": "AMZN", "expiry": "2026-07-22", "calls": 73126, "puts": 47357, "total": 120483, "tilt": 60.7, "spot": 248.06, "spot_change_pct": -0.772, "tilt_prev": 74.8}, {"symbol": "AVGO", "expiry": "2026-07-22", "calls": 19366, "puts": 11657, "total": 31023, "tilt": 62.4, "spot": 386.13, "spot_change_pct": 2.1076, "tilt_prev": 62.8}, {"symbol": "IBIT", "expiry": "2026-07-24", "calls": 86082, "puts": 40602, "total": 126684, "tilt": 68.0, "spot": 37.64, "spot_change_pct": 2.0331, "tilt_prev": 74.3}, {"symbol": "GOOGL", "expiry": "2026-07-24", "calls": 28987, "puts": 17318, "total": 46305, "tilt": 62.6, "spot": 349.03, "spot_change_pct": -0.8409, "tilt_prev": 21.4}, {"symbol": "META", "expiry": "2026-07-22", "calls": 53599, "puts": 21028, "total": 74627, "tilt": 71.8, "spot": 646.3684, "spot_change_pct": 0.0803, "tilt_prev": 67.5}, {"symbol": "MSFT", "expiry": "2026-07-22", "calls": 117702, "puts": 30826, "total": 148528, "tilt": 79.2, "spot": 398.65, "spot_change_pct": -0.9048, "tilt_prev": 83.2}, {"symbol": "NVDA", "expiry": "2026-07-22", "calls": 556632, "puts": 307756, "total": 864388, "tilt": 64.4, "spot": 205.95, "spot_change_pct": 1.3135, "tilt_prev": 60.2}, {"symbol": "TSLA", "expiry": "2026-07-24", "calls": 282821, "puts": 152607, "total": 435428, "tilt": 65.0, "spot": 379.84, "spot_change_pct": 2.7789, "tilt_prev": 52.6}, {"symbol": "AMD", "expiry": "2026-07-22", "calls": 68096, "puts": 38133, "total": 106229, "tilt": 64.1, "spot": 541.3, "spot_change_pct": 7.4925, "tilt_prev": 53.1}, {"symbol": "XLF", "expiry": "2026-07-22", "calls": 6887, "puts": 1162, "total": 8049, "tilt": 85.6, "spot": 56.275, "spot_change_pct": 0.4193, "tilt_prev": 38.3}, {"symbol": "INTC", "expiry": "2026-07-22", "calls": 125515, "puts": 55194, "total": 180709, "tilt": 69.5, "spot": 105.13, "spot_change_pct": 8.3144, "tilt_prev": 69.6}, {"symbol": "MU", "expiry": "2026-07-22", "calls": 128886, "puts": 130454, "total": 259340, "tilt": 49.7, "spot": 975.79, "spot_change_pct": 12.7481, "tilt_prev": 50.8}, {"symbol": "SMH", "expiry": "2026-07-22", "calls": 8193, "puts": 16236, "total": 24429, "tilt": 33.5, "spot": 584.57, "spot_change_pct": 4.6061, "tilt_prev": 45.7}, {"symbol": "GLD", "expiry": "2026-07-22", "calls": 8756, "puts": 7988, "total": 16744, "tilt": 52.3, "spot": 373.53, "spot_change_pct": 1.6132, "tilt_prev": 41.6}, {"symbol": "SLV", "expiry": "2026-07-22", "calls": 21951, "puts": 14860, "total": 36811, "tilt": 59.6, "spot": 53.124, "spot_change_pct": 4.2056, "tilt_prev": 48.2}, {"symbol": "TLT", "expiry": "2026-07-22", "calls": 5049, "puts": 7436, "total": 12485, "tilt": 40.4, "spot": 83.605, "spot_change_pct": -0.3397, "tilt_prev": 26.1}], "failed": []};
+const FALLBACK = {"generated": "2026-07-21T20:00:48+00:00", "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations", "rows": [{"symbol": "AAPL", "spot": 327.72, "spot_change_pct": 0.346, "expiry": "2026-07-22", "near": {"calls": 379165, "puts": 254823, "total": 633988, "tilt": 59.8, "tilt_prev": null}, "chain": {"calls": 661013, "puts": 420936, "total": 1081949, "tilt": 61.1, "tilt_prev": null}}, {"symbol": "AMZN", "spot": 247.435, "spot_change_pct": -1.022, "expiry": "2026-07-22", "near": {"calls": 107963, "puts": 59623, "total": 167586, "tilt": 64.4, "tilt_prev": null}, "chain": {"calls": 345093, "puts": 147412, "total": 492505, "tilt": 70.1, "tilt_prev": null}}, {"symbol": "AVGO", "spot": 386.27, "spot_change_pct": 2.1446, "expiry": "2026-07-22", "near": {"calls": 23507, "puts": 14080, "total": 37587, "tilt": 62.5, "tilt_prev": null}, "chain": {"calls": 86859, "puts": 50239, "total": 137098, "tilt": 63.4, "tilt_prev": null}}, {"symbol": "IBIT", "spot": 37.635, "spot_change_pct": 2.0195, "expiry": "2026-07-24", "near": {"calls": 105464, "puts": 51820, "total": 157284, "tilt": 67.1, "tilt_prev": null}, "chain": {"calls": 348465, "puts": 169489, "total": 517954, "tilt": 67.3, "tilt_prev": null}}, {"symbol": "GOOGL", "spot": 348.98, "spot_change_pct": -0.8551, "expiry": "2026-07-24", "near": {"calls": 50641, "puts": 25276, "total": 75917, "tilt": 66.7, "tilt_prev": null}, "chain": {"calls": 140602, "puts": 66039, "total": 206641, "tilt": 68.0, "tilt_prev": null}}, {"symbol": "META", "spot": 648.24, "spot_change_pct": 0.3701, "expiry": "2026-07-22", "near": {"calls": 72217, "puts": 28637, "total": 100854, "tilt": 71.6, "tilt_prev": null}, "chain": {"calls": 214143, "puts": 74675, "total": 288818, "tilt": 74.1, "tilt_prev": null}}, {"symbol": "MSFT", "spot": 398.645, "spot_change_pct": -0.9061, "expiry": "2026-07-22", "near": {"calls": 141523, "puts": 38301, "total": 179824, "tilt": 78.7, "tilt_prev": null}, "chain": {"calls": 278710, "puts": 89576, "total": 368286, "tilt": 75.7, "tilt_prev": null}}, {"symbol": "NVDA", "spot": 206.91, "spot_change_pct": 1.7857, "expiry": "2026-07-22", "near": {"calls": 799726, "puts": 424298, "total": 1224024, "tilt": 65.3, "tilt_prev": null}, "chain": {"calls": 1455032, "puts": 757445, "total": 2212477, "tilt": 65.8, "tilt_prev": null}}, {"symbol": "TSLA", "spot": 377.8199, "spot_change_pct": 2.2323, "expiry": "2026-07-24", "near": {"calls": 346978, "puts": 202956, "total": 549934, "tilt": 63.1, "tilt_prev": null}, "chain": {"calls": 540727, "puts": 314196, "total": 854923, "tilt": 63.2, "tilt_prev": null}}, {"symbol": "AMD", "spot": 541.795, "spot_change_pct": 7.5908, "expiry": "2026-07-22", "near": {"calls": 92855, "puts": 57412, "total": 150267, "tilt": 61.8, "tilt_prev": null}, "chain": {"calls": 243406, "puts": 147496, "total": 390902, "tilt": 62.3, "tilt_prev": null}}, {"symbol": "XLF", "spot": 56.115, "spot_change_pct": 0.1338, "expiry": "2026-07-22", "near": {"calls": 8424, "puts": 1374, "total": 9798, "tilt": 86.0, "tilt_prev": null}, "chain": {"calls": 52109, "puts": 75037, "total": 127146, "tilt": 41.0, "tilt_prev": null}}, {"symbol": "INTC", "spot": 105.65, "spot_change_pct": 8.8502, "expiry": "2026-07-22", "near": {"calls": 187398, "puts": 76900, "total": 264298, "tilt": 70.9, "tilt_prev": null}, "chain": {"calls": 412201, "puts": 216292, "total": 628493, "tilt": 65.6, "tilt_prev": null}}, {"symbol": "MU", "spot": 972.915, "spot_change_pct": 12.4159, "expiry": "2026-07-22", "near": {"calls": 169819, "puts": 183638, "total": 353457, "tilt": 48.0, "tilt_prev": null}, "chain": {"calls": 423628, "puts": 514351, "total": 937979, "tilt": 45.2, "tilt_prev": null}}, {"symbol": "SMH", "spot": 584.0, "spot_change_pct": 4.5041, "expiry": "2026-07-22", "near": {"calls": 13176, "puts": 27098, "total": 40274, "tilt": 32.7, "tilt_prev": null}, "chain": {"calls": 65321, "puts": 239812, "total": 305133, "tilt": 21.4, "tilt_prev": null}}, {"symbol": "GLD", "spot": 374.66, "spot_change_pct": 1.9206, "expiry": "2026-07-22", "near": {"calls": 13854, "puts": 9970, "total": 23824, "tilt": 58.2, "tilt_prev": null}, "chain": {"calls": 99521, "puts": 60329, "total": 159850, "tilt": 62.3, "tilt_prev": null}}, {"symbol": "SLV", "spot": 53.09, "spot_change_pct": 4.1389, "expiry": "2026-07-22", "near": {"calls": 27722, "puts": 17730, "total": 45452, "tilt": 61.0, "tilt_prev": null}, "chain": {"calls": 192970, "puts": 92822, "total": 285792, "tilt": 67.5, "tilt_prev": null}}, {"symbol": "TLT", "spot": 83.685, "spot_change_pct": -0.2444, "expiry": "2026-07-22", "near": {"calls": 6265, "puts": 9709, "total": 15974, "tilt": 39.2, "tilt_prev": null}, "chain": {"calls": 727003, "puts": 114250, "total": 841253, "tilt": 86.4, "tilt_prev": null}}], "failed": []};
 
 const fmt = n => n == null ? "—" : n.toLocaleString("en-US");
-const state = { rows: [], key: "tilt", asc: false };
+const state = { rows: [], view: "chain", key: "tilt", asc: false };
+
+// Active view: {calls, puts, total, tilt, tilt_prev}. Falls back to the old flat
+// schema during a deploy so a mid-transition data fetch still renders.
+const av = r => r[state.view] || (r.tilt != null
+  ? { calls: r.calls, puts: r.puts, total: r.total, tilt: r.tilt, tilt_prev: r.tilt_prev }
+  : {});
+const spread = r => (r.near?.tilt != null && r.chain?.tilt != null)
+  ? +(r.near.tilt - r.chain.tilt).toFixed(1) : null;
+
+function cell(r, key) {              // resolve a sort key against the active view
+  switch (key) {
+    case "symbol": return r.symbol;
+    case "expiry": return r.expiry || "";
+    case "spot":   return r.spot;
+    case "tilt":   return av(r).tilt;
+    case "spread": return spread(r);
+    case "tilt_prev": { const a = av(r); return (a.tilt != null && a.tilt_prev != null) ? a.tilt - a.tilt_prev : null; }
+    default:       return av(r)[key];   // calls / puts / total
+  }
+}
 
 function render() {
   const { rows, key, asc } = state;
   rows.sort((a, b) => {
-    const x = a[key] ?? -Infinity, y = b[key] ?? -Infinity;
+    const x = cell(a, key) ?? -Infinity, y = cell(b, key) ?? -Infinity;
     if (typeof x === "string") return asc ? x.localeCompare(y) : y.localeCompare(x);
     return asc ? x - y : y - x;
   });
   document.getElementById("rows").innerHTML = rows.map(r => {
-    const t = r.tilt ?? 50;
+    const a = av(r);
+    const t = a.tilt ?? 50;
     const dev = Math.abs(t - 50) / 2;               // % width of half-track
     const side = t >= 50 ? "c" : "p";
-    const d = (r.tilt != null && r.tilt_prev != null) ? (r.tilt - r.tilt_prev) : null;
+    const d = (a.tilt != null && a.tilt_prev != null) ? (a.tilt - a.tilt_prev) : null;
+    const sp = spread(r);
     const chg = r.spot_change_pct;
+    const exp = state.view === "near" ? (r.expiry ? r.expiry.slice(5).replace("-","/") : "—") : "all";
     return `<tr>
       <td class="sym">${r.symbol}</td>
-      <td class="exp">${r.expiry ? r.expiry.slice(5).replace("-","/") : "—"}</td>
+      <td class="exp">${exp}</td>
       <td class="spot hide-sm">${r.spot?.toFixed(2) ?? "—"}<span class="${chg >= 0 ? "up" : "dn"}">${chg == null ? "" : (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%"}</span></td>
-      <td class="score" style="color:var(--${t >= 50 ? "calls" : "puts"})">${r.tilt ?? "—"}</td>
+      <td class="score" style="color:var(--${t >= 50 ? "calls" : "puts"})">${a.tilt ?? "—"}</td>
       <td class="bar"><div class="track"><div class="fill ${side}" style="width:${dev}%"></div></div></td>
+      <td class="spread ${sp == null ? "" : (sp >= 0 ? "up" : "dn")}">${sp == null ? "—" : (sp >= 0 ? "+" : "") + sp.toFixed(1)}</td>
       <td class="delta dcol">${d == null ? "—" : (d >= 0 ? "+" : "") + d.toFixed(1)}</td>
-      <td class="hide-sm">${fmt(r.calls)}</td>
-      <td class="hide-sm">${fmt(r.puts)}</td>
-      <td>${fmt(r.total)}</td>
+      <td class="hide-sm">${fmt(a.calls)}</td>
+      <td class="hide-sm">${fmt(a.puts)}</td>
+      <td>${fmt(a.total)}</td>
     </tr>`;
   }).join("");
 }
@@ -185,9 +226,17 @@ document.querySelectorAll("thead th[data-k]").forEach(th => {
   });
 });
 
+document.querySelectorAll("#toggle button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.view = b.dataset.view;
+    document.querySelectorAll("#toggle button").forEach(x => x.classList.toggle("on", x === b));
+    render();
+  });
+});
+
 function load(data, live) {
   state.rows = data.rows || [];
-  const hasHistory = state.rows.some(r => r.tilt_prev != null);
+  const hasHistory = state.rows.some(r => r.near?.tilt_prev != null || r.chain?.tilt_prev != null);
   document.body.classList.toggle("no-history", !hasHistory);
   if (!hasHistory && state.key === "tilt_prev") { state.key = "tilt"; state.asc = false; }
   const ts = new Date(data.generated);
