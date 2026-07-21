@@ -38,18 +38,32 @@ SYMBOLS = [
 ]
 
 URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
-OUT = Path(__file__).resolve().parent / "tilt.json"
+# Output path defaults next to the script (GitHub Pages layout); on the droplet
+# TILT_JSON points at the nginx-served data dir, outside the git checkout.
+OUT = Path(os.environ.get("TILT_JSON") or (Path(__file__).resolve().parent / "tilt.json"))
 OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])\d{8}$")
 EXPIRY_AFTER_TODAY = False   # False = keep the same-day 0DTE (this is a 0DTE service)
 VOLUME_FLOOR = 1000          # roll past any expiry trading fewer contracts than this
 HISTORY_KEEP = 60
 
-# Optional alerting. Both are no-ops when the env var is unset, so local runs
-# stay quiet. In CI these come from repo secrets of the same name.
-#   SLACK_WEBHOOK_URL - partial-failure alerts posted from this script.
-#   (Hard failures / crashes are alerted by the workflow's if:failure() step,
-#    which also drives the healthchecks.io dead-man's-switch.)
+# Optional alerting, all no-ops when the env var is unset (so local runs stay
+# quiet). On the droplet these come from /home/deploy/tiltscore/.env; the fetcher
+# self-reports so it needs no GitHub Actions wrapper:
+#   SLACK_WEBHOOK_URL - partial failures (from main) + hard failures (from __main__).
+#   HEALTHCHECK_URL   - success pings the URL, failure pings URL + "/fail"; a missed
+#                       ping trips the healthchecks.io dead-man's-switch.
 SLACK_WEBHOOK = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
+HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "").strip()
+
+
+def ping_healthcheck(suffix: str = "") -> None:
+    """Best-effort healthchecks.io ping. Never raises."""
+    if not HEALTHCHECK_URL:
+        return
+    try:
+        urllib.request.urlopen(HEALTHCHECK_URL.rstrip("/") + suffix, timeout=15).read()
+    except Exception as e:
+        print(f"  healthcheck ping failed: {e}", file=sys.stderr)
 
 
 def run_url() -> str:
@@ -175,4 +189,15 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    except Exception as e:
+        notify_slack(f":rotating_light: Tilt Score fetch crashed: {e}")
+        ping_healthcheck("/fail")
+        raise
+    if code == 0:
+        ping_healthcheck()          # healthy run -> keep the dead-man's-switch happy
+    else:
+        notify_slack(":rotating_light: Tilt Score fetch produced no rows (all symbols failed).")
+        ping_healthcheck("/fail")
+    sys.exit(code)
