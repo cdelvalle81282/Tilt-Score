@@ -1,10 +1,12 @@
 name: Update tilt scores
 
 on:
-  schedule:
-    # 21:45 UTC = 5:45pm EDT / 4:45pm EST — after the close year-round.
-    # GitHub cron is UTC and doesn't follow US daylight saving.
-    - cron: "45 21 * * 1-5"
+  # The live updater is now the droplet's systemd timer (every 15 min, market
+  # hours), which serves tilt.json at https://tiltnxt.duckdns.org/tilt.json.
+  # The scheduled trigger below is retired; this workflow is kept only as a
+  # manual backup (it still commits tilt.json into the repo when dispatched).
+  # schedule:
+  #   - cron: "45 21 * * 1-5"
   workflow_dispatch:      # manual "Run workflow" button in the Actions tab
     inputs:
       simulate_failure:

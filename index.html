@@ -200,11 +200,10 @@ function load(data, live) {
   render();
 }
 
-/* Where the page finds its data. "tilt.json" works when this file sits in the
-   same repo/folder as the JSON (GitHub Pages). If you paste this HTML into
-   wisepub or any other host, point it at the absolute Pages URL instead, e.g.
-   const DATA_URL = "https://YOURUSER.github.io/YOURREPO/tilt.json"; */
-const DATA_URL = "tilt.json";
+/* Where the page finds its data. The droplet refreshes this every 15 min during
+   market hours and serves it with open CORS, so this absolute URL works from
+   GitHub Pages, from wisepub, or from anywhere else the page is embedded. */
+const DATA_URL = "https://tiltnxt.duckdns.org/tilt.json";
 
 fetch(DATA_URL, { cache: "no-store" })
   .then(r => { if (!r.ok) throw 0; return r.json(); })
