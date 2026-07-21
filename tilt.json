@@ -1,192 +1,192 @@
 {
- "generated": "2026-07-21T02:57:43+00:00",
- "source": "Cboe delayed quotes, front expiration only (15-min delay; intraday values are partial-day)",
+ "generated": "2026-07-21T17:27:04+00:00",
+ "source": "Cboe delayed quotes, nearest expiration incl. same-day 0DTE (15-min delay; intraday values are partial-day)",
  "rows": [
   {
    "symbol": "AAPL",
    "expiry": "2026-07-22",
-   "calls": 144946,
-   "puts": 91086,
-   "total": 236032,
-   "tilt": 61.4,
-   "spot": 326.0,
-   "spot_change_pct": -2.1424,
+   "calls": 292168,
+   "puts": 188220,
+   "total": 480388,
+   "tilt": 60.8,
+   "spot": 328.545,
+   "spot_change_pct": 0.5986,
    "tilt_prev": 52.7
   },
   {
    "symbol": "AMZN",
    "expiry": "2026-07-22",
-   "calls": 72855,
-   "puts": 25763,
-   "total": 98618,
-   "tilt": 73.9,
-   "spot": 249.45,
-   "spot_change_pct": 1.1164,
+   "calls": 73126,
+   "puts": 47357,
+   "total": 120483,
+   "tilt": 60.7,
+   "spot": 248.06,
+   "spot_change_pct": -0.772,
    "tilt_prev": 74.8
   },
   {
    "symbol": "AVGO",
    "expiry": "2026-07-22",
-   "calls": 11845,
-   "puts": 7109,
-   "total": 18954,
-   "tilt": 62.5,
-   "spot": 379.69,
-   "spot_change_pct": 1.9766,
+   "calls": 19366,
+   "puts": 11657,
+   "total": 31023,
+   "tilt": 62.4,
+   "spot": 386.13,
+   "spot_change_pct": 2.1076,
    "tilt_prev": 62.8
   },
   {
    "symbol": "IBIT",
    "expiry": "2026-07-24",
-   "calls": 104691,
-   "puts": 49210,
-   "total": 153901,
+   "calls": 86082,
+   "puts": 40602,
+   "total": 126684,
    "tilt": 68.0,
-   "spot": 36.9792,
-   "spot_change_pct": 1.4856,
+   "spot": 37.64,
+   "spot_change_pct": 2.0331,
    "tilt_prev": 74.3
   },
   {
    "symbol": "GOOGL",
-   "expiry": "2026-07-22",
-   "calls": 37,
-   "puts": 109,
-   "total": 146,
-   "tilt": 25.3,
-   "spot": 353.43,
-   "spot_change_pct": 1.5053,
+   "expiry": "2026-07-24",
+   "calls": 28987,
+   "puts": 17318,
+   "total": 46305,
+   "tilt": 62.6,
+   "spot": 349.03,
+   "spot_change_pct": -0.8409,
    "tilt_prev": 21.4
   },
   {
    "symbol": "META",
    "expiry": "2026-07-22",
-   "calls": 26886,
-   "puts": 14443,
-   "total": 41329,
-   "tilt": 65.1,
-   "spot": 643.65,
-   "spot_change_pct": -0.0248,
+   "calls": 53599,
+   "puts": 21028,
+   "total": 74627,
+   "tilt": 71.8,
+   "spot": 646.3684,
+   "spot_change_pct": 0.0803,
    "tilt_prev": 67.5
   },
   {
    "symbol": "MSFT",
    "expiry": "2026-07-22",
-   "calls": 64549,
-   "puts": 18899,
-   "total": 83448,
-   "tilt": 77.4,
-   "spot": 401.0232,
-   "spot_change_pct": 2.1507,
+   "calls": 117702,
+   "puts": 30826,
+   "total": 148528,
+   "tilt": 79.2,
+   "spot": 398.65,
+   "spot_change_pct": -0.9048,
    "tilt_prev": 83.2
   },
   {
    "symbol": "NVDA",
    "expiry": "2026-07-22",
-   "calls": 250488,
-   "puts": 178847,
-   "total": 429335,
-   "tilt": 58.3,
-   "spot": 203.0892,
-   "spot_change_pct": 0.2317,
+   "calls": 556632,
+   "puts": 307756,
+   "total": 864388,
+   "tilt": 64.4,
+   "spot": 205.95,
+   "spot_change_pct": 1.3135,
    "tilt_prev": 60.2
   },
   {
    "symbol": "TSLA",
    "expiry": "2026-07-24",
-   "calls": 194781,
-   "puts": 166048,
-   "total": 360829,
-   "tilt": 54.0,
-   "spot": 370.5,
-   "spot_change_pct": -2.9592,
+   "calls": 282821,
+   "puts": 152607,
+   "total": 435428,
+   "tilt": 65.0,
+   "spot": 379.84,
+   "spot_change_pct": 2.7789,
    "tilt_prev": 52.6
   },
   {
    "symbol": "AMD",
    "expiry": "2026-07-22",
-   "calls": 23875,
-   "puts": 24390,
-   "total": 48265,
-   "tilt": 49.5,
-   "spot": 505.44,
-   "spot_change_pct": 1.5754,
+   "calls": 68096,
+   "puts": 38133,
+   "total": 106229,
+   "tilt": 64.1,
+   "spot": 541.3,
+   "spot_change_pct": 7.4925,
    "tilt_prev": 53.1
   },
   {
    "symbol": "XLF",
    "expiry": "2026-07-22",
-   "calls": 1991,
-   "puts": 1705,
-   "total": 3696,
-   "tilt": 53.9,
-   "spot": 56.04,
-   "spot_change_pct": -0.3926,
+   "calls": 6887,
+   "puts": 1162,
+   "total": 8049,
+   "tilt": 85.6,
+   "spot": 56.275,
+   "spot_change_pct": 0.4193,
    "tilt_prev": 38.3
   },
   {
    "symbol": "INTC",
    "expiry": "2026-07-22",
-   "calls": 89758,
-   "puts": 32514,
-   "total": 122272,
-   "tilt": 73.4,
-   "spot": 97.64,
-   "spot_change_pct": 2.1254,
+   "calls": 125515,
+   "puts": 55194,
+   "total": 180709,
+   "tilt": 69.5,
+   "spot": 105.13,
+   "spot_change_pct": 8.3144,
    "tilt_prev": 69.6
   },
   {
    "symbol": "MU",
    "expiry": "2026-07-22",
-   "calls": 45486,
-   "puts": 53486,
-   "total": 98972,
-   "tilt": 46.0,
-   "spot": 872.25,
-   "spot_change_pct": 1.9448,
+   "calls": 128886,
+   "puts": 130454,
+   "total": 259340,
+   "tilt": 49.7,
+   "spot": 975.79,
+   "spot_change_pct": 12.7481,
    "tilt_prev": 50.8
   },
   {
    "symbol": "SMH",
    "expiry": "2026-07-22",
-   "calls": 8358,
-   "puts": 24774,
-   "total": 33132,
-   "tilt": 25.2,
-   "spot": 558.0,
-   "spot_change_pct": 0.4133,
+   "calls": 8193,
+   "puts": 16236,
+   "total": 24429,
+   "tilt": 33.5,
+   "spot": 584.57,
+   "spot_change_pct": 4.6061,
    "tilt_prev": 45.7
   },
   {
    "symbol": "GLD",
    "expiry": "2026-07-22",
-   "calls": 7941,
-   "puts": 8613,
-   "total": 16554,
-   "tilt": 48.0,
-   "spot": 367.6,
-   "spot_change_pct": -0.2199,
+   "calls": 8756,
+   "puts": 7988,
+   "total": 16744,
+   "tilt": 52.3,
+   "spot": 373.53,
+   "spot_change_pct": 1.6132,
    "tilt_prev": 41.6
   },
   {
    "symbol": "SLV",
    "expiry": "2026-07-22",
-   "calls": 12363,
-   "puts": 11658,
-   "total": 24021,
-   "tilt": 51.5,
-   "spot": 50.98,
-   "spot_change_pct": 0.3939,
+   "calls": 21951,
+   "puts": 14860,
+   "total": 36811,
+   "tilt": 59.6,
+   "spot": 53.124,
+   "spot_change_pct": 4.2056,
    "tilt_prev": 48.2
   },
   {
    "symbol": "TLT",
    "expiry": "2026-07-22",
-   "calls": 5144,
-   "puts": 10661,
-   "total": 15805,
-   "tilt": 32.5,
-   "spot": 83.92,
-   "spot_change_pct": -0.7454,
+   "calls": 5049,
+   "puts": 7436,
+   "total": 12485,
+   "tilt": 40.4,
+   "spot": 83.605,
+   "spot_change_pct": -0.3397,
    "tilt_prev": 26.1
   }
  ],
@@ -200,8 +200,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 61.4,
-    "total": 236032
+    "tilt": 60.8,
+    "total": 480388
    }
   ],
   "AMZN": [
@@ -212,8 +212,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 73.9,
-    "total": 98618
+    "tilt": 60.7,
+    "total": 120483
    }
   ],
   "AVGO": [
@@ -224,8 +224,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 62.5,
-    "total": 18954
+    "tilt": 62.4,
+    "total": 31023
    }
   ],
   "IBIT": [
@@ -237,7 +237,7 @@
    {
     "date": "2026-07-21",
     "tilt": 68.0,
-    "total": 153901
+    "total": 126684
    }
   ],
   "GOOGL": [
@@ -248,8 +248,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 25.3,
-    "total": 146
+    "tilt": 62.6,
+    "total": 46305
    }
   ],
   "META": [
@@ -260,8 +260,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 65.1,
-    "total": 41329
+    "tilt": 71.8,
+    "total": 74627
    }
   ],
   "MSFT": [
@@ -272,8 +272,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 77.4,
-    "total": 83448
+    "tilt": 79.2,
+    "total": 148528
    }
   ],
   "NVDA": [
@@ -284,8 +284,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 58.3,
-    "total": 429335
+    "tilt": 64.4,
+    "total": 864388
    }
   ],
   "TSLA": [
@@ -296,8 +296,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 54.0,
-    "total": 360829
+    "tilt": 65.0,
+    "total": 435428
    }
   ],
   "AMD": [
@@ -308,8 +308,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 49.5,
-    "total": 48265
+    "tilt": 64.1,
+    "total": 106229
    }
   ],
   "XLF": [
@@ -320,8 +320,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 53.9,
-    "total": 3696
+    "tilt": 85.6,
+    "total": 8049
    }
   ],
   "INTC": [
@@ -332,8 +332,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 73.4,
-    "total": 122272
+    "tilt": 69.5,
+    "total": 180709
    }
   ],
   "MU": [
@@ -344,8 +344,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 46.0,
-    "total": 98972
+    "tilt": 49.7,
+    "total": 259340
    }
   ],
   "SMH": [
@@ -356,8 +356,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 25.2,
-    "total": 33132
+    "tilt": 33.5,
+    "total": 24429
    }
   ],
   "GLD": [
@@ -368,8 +368,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 48.0,
-    "total": 16554
+    "tilt": 52.3,
+    "total": 16744
    }
   ],
   "SLV": [
@@ -380,8 +380,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 51.5,
-    "total": 24021
+    "tilt": 59.6,
+    "total": 36811
    }
   ],
   "TLT": [
@@ -392,8 +392,8 @@
    },
    {
     "date": "2026-07-21",
-    "tilt": 32.5,
-    "total": 15805
+    "tilt": 40.4,
+    "total": 12485
    }
   ]
  }
