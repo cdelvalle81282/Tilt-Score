@@ -22,6 +22,7 @@ inside tilt.json so the page can show day-over-day change.
 """
 
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -38,6 +39,36 @@ OUT = Path(__file__).resolve().parent / "tilt.json"
 OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])\d{8}$")
 EXPIRY_AFTER_TODAY = True
 HISTORY_KEEP = 60
+
+# Optional alerting. Both are no-ops when the env var is unset, so local runs
+# stay quiet. In CI these come from repo secrets of the same name.
+#   SLACK_WEBHOOK_URL - partial-failure alerts posted from this script.
+#   (Hard failures / crashes are alerted by the workflow's if:failure() step,
+#    which also drives the healthchecks.io dead-man's-switch.)
+SLACK_WEBHOOK = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
+
+
+def run_url() -> str:
+    """Link back to the GitHub Actions run, when this runs in CI."""
+    server = os.environ.get("GITHUB_SERVER_URL")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    return f"{server}/{repo}/actions/runs/{run_id}" if server and repo and run_id else ""
+
+
+def notify_slack(text: str) -> None:
+    """Best-effort Slack post. Never raises: a broken alert must not fail the run."""
+    if not SLACK_WEBHOOK:
+        return
+    req = urllib.request.Request(
+        SLACK_WEBHOOK,
+        data=json.dumps({"text": text}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15).read()
+    except Exception as e:
+        print(f"  slack notify failed: {e}", file=sys.stderr)
 
 
 def fetch_symbol(sym: str) -> dict | None:
@@ -122,6 +153,16 @@ def main() -> int:
     }
     OUT.write_text(json.dumps(out, indent=1))
     print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed)")
+
+    # Partial failure: the file still wrote and the job will exit 0, so nobody
+    # sees it unless we say so. (All-fail returns 1 below and the workflow's
+    # failure step alerts instead, so we don't double-post here.)
+    if failed and rows:
+        link = run_url()
+        msg = (f":warning: Tilt Score: {len(failed)} of {len(SYMBOLS)} symbols "
+               f"failed to fetch ({', '.join(failed)}). Page updated with the rest.")
+        notify_slack(msg + (f"\n{link}" if link else ""))
+
     return 0 if rows else 1
 
 

@@ -7,6 +7,10 @@ GOTCHA.md
 # Redundant handoff bundle (source is now unpacked in the tree)
 tilt-repo.zip
 
+# Python cruft
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

@@ -13,15 +13,19 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 10    # a hung fetch fails loudly instead of running forever
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       # Script is stdlib-only; nothing to pip install.
+      # SLACK_WEBHOOK_URL lets the script post its own partial-failure alerts.
       - name: Fetch tilt scores
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python fetch_tilt.py
 
       - name: Commit updated tilt.json
@@ -32,3 +36,37 @@ jobs:
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "Tilt scores $(date -u +%F)"
           git push
+
+      # Dead-man's-switch: a successful run pings healthchecks.io. If a
+      # scheduled ping ever goes missing (cron disabled, GitHub outage), the
+      # service alerts you. No-op until HEALTHCHECK_URL is set.
+      - name: Heartbeat (success)
+        if: success()
+        env:
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        run: |
+          if [ -n "$HEALTHCHECK_URL" ]; then
+            curl -fsS -m 15 --retry 3 "$HEALTHCHECK_URL" || true
+          else
+            echo "HEALTHCHECK_URL not set; skipping heartbeat"
+          fi
+
+      # Anything above failed (crash, all symbols down, push denied, timeout):
+      # signal the dead-man's-switch and post a loud Slack alert. Guards make
+      # each side a no-op if its secret is missing; || true keeps the alert
+      # itself from masking the real failure.
+      - name: Alert on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "$HEALTHCHECK_URL" ]; then
+            curl -fsS -m 15 --retry 3 "$HEALTHCHECK_URL/fail" || true
+          fi
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -fsS -m 15 -X POST -H 'Content-Type: application/json' \
+              -d "{\"text\":\":rotating_light: Tilt Score update FAILED. <$RUN_URL|View run>\"}" \
+              "$SLACK_WEBHOOK_URL" || true
+          fi
