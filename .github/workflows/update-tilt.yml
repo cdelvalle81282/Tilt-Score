@@ -5,7 +5,12 @@ on:
     # 21:45 UTC = 5:45pm EDT / 4:45pm EST — after the close year-round.
     # GitHub cron is UTC and doesn't follow US daylight saving.
     - cron: "45 21 * * 1-5"
-  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+  workflow_dispatch:      # manual "Run workflow" button in the Actions tab
+    inputs:
+      simulate_failure:
+        description: "Fire drill: fail on purpose to test the alerting (does not touch data)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write         # needed to commit the refreshed tilt.json
@@ -26,7 +31,12 @@ jobs:
       - name: Fetch tilt scores
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: python fetch_tilt.py
+        run: |
+          if [ "${{ inputs.simulate_failure }}" = "true" ]; then
+            echo "simulate_failure=true: failing on purpose to exercise the alert path"
+            exit 1
+          fi
+          python fetch_tilt.py
 
       - name: Commit updated tilt.json
         run: |
