@@ -1,8 +1,14 @@
 # Tilt Score (Project Next)
 
-Daily front-expiration call/put tilt for 17 tickers. Data from Cboe delayed
-quotes. A scheduled GitHub Action refreshes `tilt.json` each weekday after the
-close; `index.html` renders it.
+Daily 0DTE / nearest-expiration call/put tilt for 17 tickers. Data from Cboe
+delayed quotes. A scheduled GitHub Action refreshes `tilt.json` each weekday
+after the close; `index.html` renders it.
+
+Tilt scores the **nearest** expiration for each name, keeping the same-day
+(0DTE) expiry (this is a 0DTE/1DTE service, so the near expiry is the point).
+Any expiry trading under `VOLUME_FLOOR` (1,000 contracts) is skipped to the
+next real one, so a dead near-dated expiry (e.g. a 40-contract Wednesday)
+never prints a noisy score.
 
 ## Files
 

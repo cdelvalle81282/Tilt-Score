@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
-Tilt Score fetcher (front-expiration version).
+Tilt Score fetcher (0DTE / nearest-expiration version).
 
 Pulls delayed option chains from Cboe for each symbol, isolates the NEAREST
-UPCOMING expiration (the first expiry strictly after the run date), and
-computes tilt on that expiry's volume only.
+expiration INCLUDING the same-day (0DTE) one, and computes tilt on that
+expiry's volume only.
 
-Tilt = call volume / (call volume + put volume) * 100, front expiry only
+Tilt = call volume / (call volume + put volume) * 100, nearest expiry only
 
-Contracts expiring on the run date itself are excluded, so a Monday-evening
-run on a Mon/Wed/Fri name scores Wednesday. To include same-day (0DTE)
-volume instead, change EXPIRY_AFTER_TODAY to False.
+This is a 0DTE/1DTE service: the same-day expiry is the point, so it is kept,
+not skipped. Run after the close, a Mon/Wed/Fri name scores that day's 0DTE
+(the expiry with the real volume). Set EXPIRY_AFTER_TODAY = True to instead
+skip the same-day expiry and score the next one out (the old behavior, which
+scored near-empty expiries and produced noise on thinly-traded names).
 
 Run once per day after the close (Cboe delayed data finalizes shortly after
-4:15pm ET). Scheduling examples:
+4:15pm ET); the numbers are read the next morning as the prior session's
+0DTE tilt. Scheduling examples:
   cron (Linux/mac):   20 16 * * 1-5  cd /path/to/dir && python3 fetch_tilt.py
   Task Scheduler (Windows): daily 4:20 PM ET, action = python fetch_tilt.py
 
@@ -37,7 +40,8 @@ SYMBOLS = [
 URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
 OUT = Path(__file__).resolve().parent / "tilt.json"
 OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])\d{8}$")
-EXPIRY_AFTER_TODAY = True
+EXPIRY_AFTER_TODAY = False   # False = keep the same-day 0DTE (this is a 0DTE service)
+VOLUME_FLOOR = 1000          # roll past any expiry trading fewer contracts than this
 HISTORY_KEEP = 60
 
 # Optional alerting. Both are no-ops when the env var is unset, so local runs
@@ -96,11 +100,15 @@ def fetch_symbol(sym: str) -> dict | None:
         bucket = by_exp.setdefault(exp, [0, 0])
         bucket[0 if cp == "C" else 1] += v
 
-    # Front expiry: first one after (or on) the run date.
+    # Nearest expiry: same-day (0DTE) included unless EXPIRY_AFTER_TODAY.
     live = sorted(e for e in by_exp if (e > today if EXPIRY_AFTER_TODAY else e >= today))
     if not live:
         return None
-    front = live[0]
+    # Roll past dead expiries (e.g. GOOGL's ~40-contract Wednesday) to the first
+    # one clearing the floor; if none qualifies, take the heaviest we have.
+    front = next((e for e in live if sum(by_exp[e]) >= VOLUME_FLOOR), None)
+    if front is None:
+        front = max(live, key=lambda e: sum(by_exp[e]))
     calls, puts = by_exp[front]
     total = calls + puts
     return {
@@ -146,7 +154,7 @@ def main() -> int:
 
     out = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": "Cboe delayed quotes, front expiration only (15-min delay; intraday values are partial-day)",
+        "source": "Cboe delayed quotes, nearest expiration incl. same-day 0DTE (15-min delay; intraday values are partial-day)",
         "rows": rows,
         "failed": failed,
         "history": prior_history,
