@@ -1,8 +1,7 @@
 # Tilt Score (Project Next)
 
-Daily 0DTE / nearest-expiration call/put tilt for 17 tickers. Data from Cboe
-delayed quotes. A scheduled GitHub Action refreshes `tilt.json` each weekday
-after the close; `index.html` renders it.
+0DTE / nearest-expiration call/put tilt for 17 tickers, refreshed **every 15
+minutes during market hours**. Data from Cboe delayed quotes.
 
 Tilt scores the **nearest** expiration for each name, keeping the same-day
 (0DTE) expiry (this is a 0DTE/1DTE service, so the near expiry is the point).
@@ -10,15 +9,23 @@ Any expiry trading under `VOLUME_FLOOR` (1,000 contracts) is skipped to the
 next real one, so a dead near-dated expiry (e.g. a 40-contract Wednesday)
 never prints a noisy score.
 
+**How it runs (current):** a job on the ops droplet runs `fetch_tilt.py` every
+15 minutes during market hours and serves the result at
+`https://tiltnxt.duckdns.org/tilt.json` (open CORS). `index.html` (on GitHub
+Pages, or pasted into wisepub) fetches that URL via its `DATA_URL` constant. The
+droplet job details live in the workspace ops notes, not this repo. The GitHub
+Action below is retired to a manual backup (`workflow_dispatch` only).
+
 ## Files
 
 - `index.html`: the page. Self-contained (fonts from Google, banner embedded).
   Because it is named `index.html`, GitHub Pages serves it at the repo root URL.
-- `tilt.json`: the data, refreshed daily by the Action. Also carries the
-  per-symbol history that powers the Δ1d column, so don't delete it.
-- `fetch_tilt.py`: the fetcher. Stdlib only, no dependencies.
-- `.github/workflows/update-tilt.yml`: the schedule (5:45pm ET weekdays, plus a
-  manual "Run workflow" button in the Actions tab) and the failure alerting.
+- `tilt.json`: a seed/backup copy of the data (the live copy is served from the
+  droplet). Carries the per-symbol history that powers the Δ1d column.
+- `fetch_tilt.py`: the fetcher. Stdlib only, no dependencies. `TILT_JSON`,
+  `SLACK_WEBHOOK_URL`, `HEALTHCHECK_URL` env vars configure output path + alerts.
+- `.github/workflows/update-tilt.yml`: retired backup workflow (`workflow_dispatch`
+  only) that commits `tilt.json` into the repo if run manually.
 
 ## Setup (one time)
 
@@ -35,27 +42,22 @@ never prints a noisy score.
 
 ## Monitoring and alerts
 
-The workflow and the fetcher alert on every failure mode, loud or silent. All
-of it is opt-in through two repo secrets; leave a secret unset and that path is
-a quiet no-op.
+`fetch_tilt.py` self-reports on every failure mode, loud or silent, driven by
+two env vars (`SLACK_WEBHOOK_URL`, `HEALTHCHECK_URL`); each path is a quiet
+no-op when its var is unset. On the droplet these live in the job's `.env`.
 
-- **Hard failures** (script crash, all symbols down, push denied, 10-minute
-  timeout): the job fails and the `Alert on failure` step posts to Slack and
-  signals healthchecks.io.
+- **Hard failures** (crash, all symbols down): the run posts to Slack and pings
+  the healthchecks.io `/fail` endpoint.
 - **Partial failures** (some symbols in `failed[]` but the page still updates):
-  the job stays green, so `fetch_tilt.py` posts its own Slack heads-up naming
-  the symbols. Without this these are invisible outside the page footer.
-- **Silent stop** (cron auto-disabled after ~60 days idle, GitHub outage,
-  someone disables the workflow): a workflow can't report its own
-  non-execution, so a successful run pings a healthchecks.io check; if a
-  scheduled ping goes missing, that service alerts you.
+  the run posts its own Slack heads-up naming the symbols. Without this these
+  are invisible outside the page footer.
+- **Silent stop** (the scheduler/server dies, so no run at all): a successful
+  run pings a healthchecks.io check; if a scheduled ping goes missing, that
+  service alerts you. Set the check to cron `*/15 13-21 * * 1-5` (UTC) with a
+  ~20-minute grace so it catches a missed 15-minute update.
 
-Repo secrets (Settings, Secrets and variables, Actions):
-
-- `SLACK_WEBHOOK_URL`: a Slack incoming-webhook URL for the alert channel.
-- `HEALTHCHECK_URL`: the healthchecks.io ping URL (e.g. `https://hc-ping.com/<uuid>`,
-  no trailing slash). Configure that check's schedule to `45 21 * * 1-5` (UTC)
-  with a grace of about 1 hour, and point its notifications wherever you want.
+The retired GitHub Action (manual backup) reads the same two values from repo
+secrets instead of `.env`.
 
 ## Embedding in wisepub
 
