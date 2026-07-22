@@ -153,22 +153,32 @@ def fetch_symbol(sym: str) -> dict | None:
 
 
 def main() -> int:
-    # Load prior file so history carries forward.
+    # Load prior file so history and last-known-good rows carry forward.
     prior_history: dict[str, list] = {}
+    prior_rows: dict[str, dict] = {}
     if OUT.exists():
         try:
             prior = json.loads(OUT.read_text())
             prior_history = prior.get("history", {})
+            prior_rows = {r["symbol"]: r for r in prior.get("rows", [])}
         except Exception:
             pass
 
     today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rows, failed = [], []
     for sym in SYMBOLS:
         row = fetch_symbol(sym)
         if row is None:
             failed.append(sym)
+            # Keep showing the last-known-good figures instead of dropping the
+            # row from the page; the page's "last updated" reflects `updated`,
+            # not this run's timestamp, so a stale row reads as stale, not fresh.
+            stale = prior_rows.get(sym)
+            if stale is not None:
+                rows.append(stale)
             continue
+        row["updated"] = now_iso
         rows.append(row)
 
         hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
@@ -183,7 +193,7 @@ def main() -> int:
         print(f"  {sym}: near {row['near']['tilt']} / chain {row['chain']['tilt']}")
 
     out = {
-        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated": now_iso,
         "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations",
         "rows": rows,
         "failed": failed,
@@ -194,14 +204,16 @@ def main() -> int:
 
     # Partial failure: the file still wrote and the job will exit 0, so nobody
     # sees it unless we say so. (All-fail returns 1 below and the workflow's
-    # failure step alerts instead, so we don't double-post here.)
-    if failed and rows:
+    # failure step alerts instead, so we don't double-post here.) Gate on
+    # `failed` counts, not `rows` truthiness: rows now carries stale entries
+    # forward, so it stays non-empty even when every fetch failed this run.
+    if failed and len(failed) < len(SYMBOLS):
         link = run_url()
         msg = (f":warning: Tilt Score: {len(failed)} of {len(SYMBOLS)} symbols "
                f"failed to fetch ({', '.join(failed)}). Page updated with the rest.")
         notify_slack(msg + (f"\n{link}" if link else ""))
 
-    return 0 if rows else 1
+    return 0 if len(failed) < len(SYMBOLS) else 1
 
 
 if __name__ == "__main__":

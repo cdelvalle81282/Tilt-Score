@@ -239,7 +239,13 @@ function load(data, live) {
   const hasHistory = state.rows.some(r => r.near?.tilt_prev != null || r.chain?.tilt_prev != null);
   document.body.classList.toggle("no-history", !hasHistory);
   if (!hasHistory && state.key === "tilt_prev") { state.key = "tilt"; state.asc = false; }
-  const ts = new Date(data.generated);
+  // Rows carried forward from a failed fetch keep their own `updated` stamp
+  // (older than `data.generated`), so the header shows when the figures
+  // actually last changed, not just when the script last ran.
+  const updates = state.rows
+    .map(r => new Date(r.updated || data.generated).getTime())
+    .filter(t => !isNaN(t));
+  const ts = new Date(updates.length ? Math.max(...updates) : data.generated);
   document.getElementById("stamp").textContent =
     ts.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
   let note = data.source || "";
