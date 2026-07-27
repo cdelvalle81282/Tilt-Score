@@ -45,13 +45,22 @@ OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])\d{8}$")
 EXPIRY_AFTER_TODAY = False   # False = keep the same-day 0DTE (this is a 0DTE service)
 VOLUME_FLOOR = 1000          # roll past any expiry trading fewer contracts than this
 HISTORY_KEEP = 60
+STALE_MINUTES = 45           # alert only when no symbol has refreshed in this long
+
+# Returned when the fetch itself worked but the chain carries no volume yet. Cboe
+# zeroes the session volume when its file rolls to the new session (~9:45am ET),
+# so every symbol comes back empty for exactly one 15-min cycle each morning.
+# That is not a failure: the prior row carries forward and the next run fills in.
+EMPTY = object()
 
 # Optional alerting, all no-ops when the env var is unset (so local runs stay
 # quiet). On the droplet these come from /home/deploy/tiltscore/.env; the fetcher
 # self-reports so it needs no GitHub Actions wrapper:
-#   SLACK_WEBHOOK_URL - partial failures (from main) + hard failures (from __main__).
-#   HEALTHCHECK_URL   - success pings the URL, failure pings URL + "/fail"; a missed
-#                       ping trips the healthchecks.io dead-man's-switch.
+#   SLACK_WEBHOOK_URL - partial failures and stale data (from main) + crashes
+#                       (from __main__).
+#   HEALTHCHECK_URL   - a run that leaves the table fresh pings the URL, stale data
+#                       pings URL + "/fail"; a missed ping trips the healthchecks.io
+#                       dead-man's-switch.
 SLACK_WEBHOOK = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
 HEALTHCHECK_URL = os.environ.get("HEALTHCHECK_URL", "").strip()
 
@@ -89,6 +98,19 @@ def notify_slack(text: str) -> None:
         print(f"  slack notify failed: {e}", file=sys.stderr)
 
 
+def age_minutes(iso: str | None, now: datetime) -> float | None:
+    """Minutes since an ISO timestamp, or None if it is missing/unparseable."""
+    if not iso:
+        return None
+    try:
+        stamp = datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return (now - stamp).total_seconds() / 60
+
+
 def fetch_symbol(sym: str) -> dict | None:
     req = urllib.request.Request(
         URL.format(sym=sym), headers={"User-Agent": "tilt-score/1.0"}
@@ -115,14 +137,16 @@ def fetch_symbol(sym: str) -> dict | None:
         bucket[0 if cp == "C" else 1] += v
 
     if not by_exp:
-        return None
+        print(f"  {sym}: no contracts in the payload, keeping last good row")
+        return EMPTY
 
     # Whole chain: every expiration summed (matches a standard put/call read).
     calls_all = sum(c for c, _ in by_exp.values())
     puts_all = sum(p for _, p in by_exp.values())
     total_all = calls_all + puts_all
     if total_all == 0:
-        return None
+        print(f"  {sym}: zero session volume (chain just rolled), keeping last good row")
+        return EMPTY
 
     # Near-term: nearest expiry, same-day (0DTE) included unless EXPIRY_AFTER_TODAY,
     # rolling past dead expiries (e.g. GOOGL's ~40-contract Wednesday) to the first
@@ -165,12 +189,15 @@ def main() -> int:
             pass
 
     today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
-    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    rows, failed = [], []
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat(timespec="seconds")
+    rows, failed, empty = [], [], []
     for sym in SYMBOLS:
         row = fetch_symbol(sym)
-        if row is None:
-            failed.append(sym)
+        if row is None or row is EMPTY:
+            # `empty` = fetched fine, nothing to score yet (session rollover).
+            # `failed` = the fetch itself broke. Only the latter is a problem.
+            (empty if row is EMPTY else failed).append(sym)
             # Keep showing the last-known-good figures instead of dropping the
             # row from the page; the page's "last updated" reflects `updated`,
             # not this run's timestamp, so a stale row reads as stale, not fresh.
@@ -197,23 +224,43 @@ def main() -> int:
         "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations",
         "rows": rows,
         "failed": failed,
+        "empty": empty,
         "history": prior_history,
     }
     OUT.write_text(json.dumps(out, indent=1))
-    print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed)")
+    print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed, {len(empty)} empty)")
 
-    # Partial failure: the file still wrote and the job will exit 0, so nobody
-    # sees it unless we say so. (All-fail returns 1 below and the workflow's
-    # failure step alerts instead, so we don't double-post here.) Gate on
-    # `failed` counts, not `rows` truthiness: rows now carries stale entries
-    # forward, so it stays non-empty even when every fetch failed this run.
-    if failed and len(failed) < len(SYMBOLS):
+    # Health is measured on the data, not on this one run: a cycle where every
+    # symbol failed (or came back empty) is harmless as long as the carried-over
+    # rows are recent. `freshest` is the age of the most recently updated row, so
+    # a real outage trips the alert once the whole table has gone stale.
+    ages = [a for a in (age_minutes(r.get("updated"), now_dt) for r in rows) if a is not None]
+    freshest = min(ages) if ages else None
+    healthy = freshest is not None and freshest <= STALE_MINUTES
+
+    # Partial failure: the file still wrote and the job exits 0, so nobody sees
+    # it unless we say so. A run where *every* symbol failed says nothing here -
+    # one bad cycle carries forward harmlessly, and if it keeps up, the staleness
+    # alert below fires instead of one Slack post per 15 minutes.
+    if failed and healthy and len(failed) < len(SYMBOLS):
         link = run_url()
         msg = (f":warning: Tilt Score: {len(failed)} of {len(SYMBOLS)} symbols "
                f"failed to fetch ({', '.join(failed)}). Page updated with the rest.")
         notify_slack(msg + (f"\n{link}" if link else ""))
 
-    return 0 if len(failed) < len(SYMBOLS) else 1
+    if not healthy:
+        link = run_url()
+        age = f"in {int(freshest)} min" if freshest is not None else "at all"
+        detail = ", ".join(x for x in (
+            f"failed: {', '.join(failed)}" if failed else "",
+            f"no volume: {', '.join(empty)}" if empty else "",
+        ) if x)
+        msg = (f":rotating_light: Tilt Score data is stale: no symbol has updated "
+               f"{age}." + (f" ({detail})" if detail else ""))
+        notify_slack(msg + (f"\n{link}" if link else ""))
+        print(msg, file=sys.stderr)
+
+    return 0 if healthy else 1
 
 
 if __name__ == "__main__":
@@ -223,9 +270,7 @@ if __name__ == "__main__":
         notify_slack(f":rotating_light: Tilt Score fetch crashed: {e}")
         ping_healthcheck("/fail")
         raise
-    if code == 0:
-        ping_healthcheck()          # healthy run -> keep the dead-man's-switch happy
-    else:
-        notify_slack(":rotating_light: Tilt Score fetch produced no rows (all symbols failed).")
-        ping_healthcheck("/fail")
+    # main() already posted the Slack detail for an unhealthy run, so only the
+    # ping is left here: healthy keeps the dead-man's-switch happy, stale trips it.
+    ping_healthcheck("" if code == 0 else "/fail")
     sys.exit(code)
