@@ -1,196 +1,430 @@
 {
- "generated": "2026-07-21T17:27:04+00:00",
- "source": "Cboe delayed quotes, nearest expiration incl. same-day 0DTE (15-min delay; intraday values are partial-day)",
+ "generated": "2026-07-31T13:51:21+00:00",
+ "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations",
  "rows": [
   {
    "symbol": "AAPL",
-   "expiry": "2026-07-22",
-   "calls": 292168,
-   "puts": 188220,
-   "total": 480388,
-   "tilt": 60.8,
-   "spot": 328.545,
-   "spot_change_pct": 0.5986,
-   "tilt_prev": 52.7
+   "spot": 302.49,
+   "spot_change_pct": -9.2793,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 28836,
+    "puts": 98508,
+    "total": 127344,
+    "tilt": 22.6,
+    "tilt_prev": 60.8
+   },
+   "chain": {
+    "calls": 77058,
+    "puts": 181262,
+    "total": 258320,
+    "tilt": 29.8,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "AMZN",
-   "expiry": "2026-07-22",
-   "calls": 73126,
-   "puts": 47357,
-   "total": 120483,
-   "tilt": 60.7,
-   "spot": 248.06,
-   "spot_change_pct": -0.772,
-   "tilt_prev": 74.8
+   "spot": 267.91,
+   "spot_change_pct": 13.7622,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 85355,
+    "puts": 27518,
+    "total": 112873,
+    "tilt": 75.6,
+    "tilt_prev": 60.7
+   },
+   "chain": {
+    "calls": 156397,
+    "puts": 52531,
+    "total": 208928,
+    "tilt": 74.9,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "AVGO",
-   "expiry": "2026-07-22",
-   "calls": 19366,
-   "puts": 11657,
-   "total": 31023,
-   "tilt": 62.4,
-   "spot": 386.13,
-   "spot_change_pct": 2.1076,
-   "tilt_prev": 62.8
+   "spot": 397.9566,
+   "spot_change_pct": 2.6084,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 4693,
+    "puts": 3163,
+    "total": 7856,
+    "tilt": 59.7,
+    "tilt_prev": 62.4
+   },
+   "chain": {
+    "calls": 6942,
+    "puts": 5287,
+    "total": 12229,
+    "tilt": 56.8,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "IBIT",
-   "expiry": "2026-07-24",
-   "calls": 86082,
-   "puts": 40602,
-   "total": 126684,
-   "tilt": 68.0,
-   "spot": 37.64,
-   "spot_change_pct": 2.0331,
-   "tilt_prev": 74.3
+   "spot": 36.035,
+   "spot_change_pct": -1.812,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 2330,
+    "puts": 1686,
+    "total": 4016,
+    "tilt": 58.0,
+    "tilt_prev": 68.0
+   },
+   "chain": {
+    "calls": 10257,
+    "puts": 5145,
+    "total": 15402,
+    "tilt": 66.6,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "GOOGL",
-   "expiry": "2026-07-24",
-   "calls": 28987,
-   "puts": 17318,
-   "total": 46305,
-   "tilt": 62.6,
-   "spot": 349.03,
-   "spot_change_pct": -0.8409,
-   "tilt_prev": 21.4
+   "spot": 342.83,
+   "spot_change_pct": 2.7483,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 7842,
+    "puts": 1711,
+    "total": 9553,
+    "tilt": 82.1,
+    "tilt_prev": 62.6
+   },
+   "chain": {
+    "calls": 14662,
+    "puts": 3561,
+    "total": 18223,
+    "tilt": 80.5,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "META",
-   "expiry": "2026-07-22",
-   "calls": 53599,
-   "puts": 21028,
-   "total": 74627,
-   "tilt": 71.8,
-   "spot": 646.3684,
-   "spot_change_pct": 0.0803,
-   "tilt_prev": 67.5
+   "spot": 555.42,
+   "spot_change_pct": 3.0406,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 15562,
+    "puts": 9015,
+    "total": 24577,
+    "tilt": 63.3,
+    "tilt_prev": 71.8
+   },
+   "chain": {
+    "calls": 27140,
+    "puts": 14904,
+    "total": 42044,
+    "tilt": 64.6,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "MSFT",
-   "expiry": "2026-07-22",
-   "calls": 117702,
-   "puts": 30826,
-   "total": 148528,
-   "tilt": 79.2,
-   "spot": 398.65,
-   "spot_change_pct": -0.9048,
-   "tilt_prev": 83.2
+   "spot": 459.08,
+   "spot_change_pct": 1.769,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 18421,
+    "puts": 7865,
+    "total": 26286,
+    "tilt": 70.1,
+    "tilt_prev": 79.2
+   },
+   "chain": {
+    "calls": 30037,
+    "puts": 14890,
+    "total": 44927,
+    "tilt": 66.9,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "NVDA",
-   "expiry": "2026-07-22",
-   "calls": 556632,
-   "puts": 307756,
-   "total": 864388,
-   "tilt": 64.4,
-   "spot": 205.95,
-   "spot_change_pct": 1.3135,
-   "tilt_prev": 60.2
+   "spot": 199.78,
+   "spot_change_pct": 2.4303,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 111086,
+    "puts": 26553,
+    "total": 137639,
+    "tilt": 80.7,
+    "tilt_prev": 64.4
+   },
+   "chain": {
+    "calls": 177633,
+    "puts": 42544,
+    "total": 220177,
+    "tilt": 80.7,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "TSLA",
-   "expiry": "2026-07-24",
-   "calls": 282821,
-   "puts": 152607,
-   "total": 435428,
-   "tilt": 65.0,
-   "spot": 379.84,
-   "spot_change_pct": 2.7789,
-   "tilt_prev": 52.6
+   "spot": 313.8157,
+   "spot_change_pct": 1.6078,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 65464,
+    "puts": 24957,
+    "total": 90421,
+    "tilt": 72.4,
+    "tilt_prev": 65.0
+   },
+   "chain": {
+    "calls": 101003,
+    "puts": 36918,
+    "total": 137921,
+    "tilt": 73.2,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "AMD",
-   "expiry": "2026-07-22",
-   "calls": 68096,
-   "puts": 38133,
-   "total": 106229,
-   "tilt": 64.1,
-   "spot": 541.3,
-   "spot_change_pct": 7.4925,
-   "tilt_prev": 53.1
+   "spot": 512.9,
+   "spot_change_pct": 5.6676,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 15375,
+    "puts": 6792,
+    "total": 22167,
+    "tilt": 69.4,
+    "tilt_prev": 64.1
+   },
+   "chain": {
+    "calls": 28969,
+    "puts": 12862,
+    "total": 41831,
+    "tilt": 69.3,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "XLF",
-   "expiry": "2026-07-22",
-   "calls": 6887,
-   "puts": 1162,
-   "total": 8049,
-   "tilt": 85.6,
-   "spot": 56.275,
-   "spot_change_pct": 0.4193,
-   "tilt_prev": 38.3
+   "spot": 56.77,
+   "spot_change_pct": -0.4035,
+   "expiry": "2026-09-18",
+   "near": {
+    "calls": 158,
+    "puts": 40,
+    "total": 198,
+    "tilt": 79.8,
+    "tilt_prev": 85.6
+   },
+   "chain": {
+    "calls": 432,
+    "puts": 214,
+    "total": 646,
+    "tilt": 66.9,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "INTC",
-   "expiry": "2026-07-22",
-   "calls": 125515,
-   "puts": 55194,
-   "total": 180709,
-   "tilt": 69.5,
-   "spot": 105.13,
-   "spot_change_pct": 8.3144,
-   "tilt_prev": 69.6
+   "spot": 97.52,
+   "spot_change_pct": 7.012,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 17588,
+    "puts": 8453,
+    "total": 26041,
+    "tilt": 67.5,
+    "tilt_prev": 69.5
+   },
+   "chain": {
+    "calls": 45102,
+    "puts": 12813,
+    "total": 57915,
+    "tilt": 77.9,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "MU",
-   "expiry": "2026-07-22",
-   "calls": 128886,
-   "puts": 130454,
-   "total": 259340,
-   "tilt": 49.7,
-   "spot": 975.79,
-   "spot_change_pct": 12.7481,
-   "tilt_prev": 50.8
+   "spot": 925.6863,
+   "spot_change_pct": 5.8338,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 23101,
+    "puts": 19293,
+    "total": 42394,
+    "tilt": 54.5,
+    "tilt_prev": 49.7
+   },
+   "chain": {
+    "calls": 34618,
+    "puts": 33288,
+    "total": 67906,
+    "tilt": 51.0,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "SMH",
-   "expiry": "2026-07-22",
-   "calls": 8193,
-   "puts": 16236,
-   "total": 24429,
-   "tilt": 33.5,
-   "spot": 584.57,
-   "spot_change_pct": 4.6061,
-   "tilt_prev": 45.7
+   "spot": 559.955,
+   "spot_change_pct": 3.907,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 2113,
+    "puts": 2323,
+    "total": 4436,
+    "tilt": 47.6,
+    "tilt_prev": 33.5
+   },
+   "chain": {
+    "calls": 4851,
+    "puts": 5007,
+    "total": 9858,
+    "tilt": 49.2,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "GLD",
-   "expiry": "2026-07-22",
-   "calls": 8756,
-   "puts": 7988,
-   "total": 16744,
-   "tilt": 52.3,
-   "spot": 373.53,
-   "spot_change_pct": 1.6132,
-   "tilt_prev": 41.6
+   "spot": 369.8943,
+   "spot_change_pct": -1.9264,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 1956,
+    "puts": 1329,
+    "total": 3285,
+    "tilt": 59.5,
+    "tilt_prev": 52.3
+   },
+   "chain": {
+    "calls": 5583,
+    "puts": 3764,
+    "total": 9347,
+    "tilt": 59.7,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "SLV",
-   "expiry": "2026-07-22",
-   "calls": 21951,
-   "puts": 14860,
-   "total": 36811,
-   "tilt": 59.6,
-   "spot": 53.124,
-   "spot_change_pct": 4.2056,
-   "tilt_prev": 48.2
+   "spot": 51.82,
+   "spot_change_pct": -3.1402,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 2488,
+    "puts": 1619,
+    "total": 4107,
+    "tilt": 60.6,
+    "tilt_prev": 59.6
+   },
+   "chain": {
+    "calls": 10489,
+    "puts": 7574,
+    "total": 18063,
+    "tilt": 58.1,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   },
   {
    "symbol": "TLT",
-   "expiry": "2026-07-22",
-   "calls": 5049,
-   "puts": 7436,
-   "total": 12485,
-   "tilt": 40.4,
-   "spot": 83.605,
-   "spot_change_pct": -0.3397,
-   "tilt_prev": 26.1
+   "spot": 82.395,
+   "spot_change_pct": -0.4891,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 798,
+    "puts": 12605,
+    "total": 13403,
+    "tilt": 6.0,
+    "tilt_prev": 40.4
+   },
+   "chain": {
+    "calls": 10524,
+    "puts": 19511,
+    "total": 30035,
+    "tilt": 35.0,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
+  },
+  {
+   "symbol": "IBM",
+   "spot": 220.63,
+   "spot_change_pct": -0.4059,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 11454,
+    "puts": 3870,
+    "total": 15324,
+    "tilt": 74.7,
+    "tilt_prev": null
+   },
+   "chain": {
+    "calls": 31271,
+    "puts": 18833,
+    "total": 50104,
+    "tilt": 62.4,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
+  },
+  {
+   "symbol": "WMT",
+   "spot": 110.2,
+   "spot_change_pct": -0.8101,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 1681,
+    "puts": 577,
+    "total": 2258,
+    "tilt": 74.4,
+    "tilt_prev": null
+   },
+   "chain": {
+    "calls": 2750,
+    "puts": 927,
+    "total": 3677,
+    "tilt": 74.8,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
+  },
+  {
+   "symbol": "ORCL",
+   "spot": 132.355,
+   "spot_change_pct": 3.759,
+   "expiry": "2026-07-31",
+   "near": {
+    "calls": 10347,
+    "puts": 1009,
+    "total": 11356,
+    "tilt": 91.1,
+    "tilt_prev": null
+   },
+   "chain": {
+    "calls": 21342,
+    "puts": 3905,
+    "total": 25247,
+    "tilt": 84.5,
+    "tilt_prev": null
+   },
+   "updated": "2026-07-31T13:51:21+00:00"
   }
  ],
  "failed": [],
+ "empty": [],
  "history": {
   "AAPL": [
    {
@@ -202,6 +436,11 @@
     "date": "2026-07-21",
     "tilt": 60.8,
     "total": 480388
+   },
+   {
+    "date": "2026-07-31",
+    "near": 22.6,
+    "chain": 29.8
    }
   ],
   "AMZN": [
@@ -214,6 +453,11 @@
     "date": "2026-07-21",
     "tilt": 60.7,
     "total": 120483
+   },
+   {
+    "date": "2026-07-31",
+    "near": 75.6,
+    "chain": 74.9
    }
   ],
   "AVGO": [
@@ -226,6 +470,11 @@
     "date": "2026-07-21",
     "tilt": 62.4,
     "total": 31023
+   },
+   {
+    "date": "2026-07-31",
+    "near": 59.7,
+    "chain": 56.8
    }
   ],
   "IBIT": [
@@ -238,6 +487,11 @@
     "date": "2026-07-21",
     "tilt": 68.0,
     "total": 126684
+   },
+   {
+    "date": "2026-07-31",
+    "near": 58.0,
+    "chain": 66.6
    }
   ],
   "GOOGL": [
@@ -250,6 +504,11 @@
     "date": "2026-07-21",
     "tilt": 62.6,
     "total": 46305
+   },
+   {
+    "date": "2026-07-31",
+    "near": 82.1,
+    "chain": 80.5
    }
   ],
   "META": [
@@ -262,6 +521,11 @@
     "date": "2026-07-21",
     "tilt": 71.8,
     "total": 74627
+   },
+   {
+    "date": "2026-07-31",
+    "near": 63.3,
+    "chain": 64.6
    }
   ],
   "MSFT": [
@@ -274,6 +538,11 @@
     "date": "2026-07-21",
     "tilt": 79.2,
     "total": 148528
+   },
+   {
+    "date": "2026-07-31",
+    "near": 70.1,
+    "chain": 66.9
    }
   ],
   "NVDA": [
@@ -286,6 +555,11 @@
     "date": "2026-07-21",
     "tilt": 64.4,
     "total": 864388
+   },
+   {
+    "date": "2026-07-31",
+    "near": 80.7,
+    "chain": 80.7
    }
   ],
   "TSLA": [
@@ -298,6 +572,11 @@
     "date": "2026-07-21",
     "tilt": 65.0,
     "total": 435428
+   },
+   {
+    "date": "2026-07-31",
+    "near": 72.4,
+    "chain": 73.2
    }
   ],
   "AMD": [
@@ -310,6 +589,11 @@
     "date": "2026-07-21",
     "tilt": 64.1,
     "total": 106229
+   },
+   {
+    "date": "2026-07-31",
+    "near": 69.4,
+    "chain": 69.3
    }
   ],
   "XLF": [
@@ -322,6 +606,11 @@
     "date": "2026-07-21",
     "tilt": 85.6,
     "total": 8049
+   },
+   {
+    "date": "2026-07-31",
+    "near": 79.8,
+    "chain": 66.9
    }
   ],
   "INTC": [
@@ -334,6 +623,11 @@
     "date": "2026-07-21",
     "tilt": 69.5,
     "total": 180709
+   },
+   {
+    "date": "2026-07-31",
+    "near": 67.5,
+    "chain": 77.9
    }
   ],
   "MU": [
@@ -346,6 +640,11 @@
     "date": "2026-07-21",
     "tilt": 49.7,
     "total": 259340
+   },
+   {
+    "date": "2026-07-31",
+    "near": 54.5,
+    "chain": 51.0
    }
   ],
   "SMH": [
@@ -358,6 +657,11 @@
     "date": "2026-07-21",
     "tilt": 33.5,
     "total": 24429
+   },
+   {
+    "date": "2026-07-31",
+    "near": 47.6,
+    "chain": 49.2
    }
   ],
   "GLD": [
@@ -370,6 +674,11 @@
     "date": "2026-07-21",
     "tilt": 52.3,
     "total": 16744
+   },
+   {
+    "date": "2026-07-31",
+    "near": 59.5,
+    "chain": 59.7
    }
   ],
   "SLV": [
@@ -382,6 +691,11 @@
     "date": "2026-07-21",
     "tilt": 59.6,
     "total": 36811
+   },
+   {
+    "date": "2026-07-31",
+    "near": 60.6,
+    "chain": 58.1
    }
   ],
   "TLT": [
@@ -394,6 +708,32 @@
     "date": "2026-07-21",
     "tilt": 40.4,
     "total": 12485
+   },
+   {
+    "date": "2026-07-31",
+    "near": 6.0,
+    "chain": 35.0
+   }
+  ],
+  "IBM": [
+   {
+    "date": "2026-07-31",
+    "near": 74.7,
+    "chain": 62.4
+   }
+  ],
+  "WMT": [
+   {
+    "date": "2026-07-31",
+    "near": 74.4,
+    "chain": 74.8
+   }
+  ],
+  "ORCL": [
+   {
+    "date": "2026-07-31",
+    "near": 91.1,
+    "chain": 84.5
    }
   ]
  }

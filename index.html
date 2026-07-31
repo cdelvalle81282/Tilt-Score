@@ -87,6 +87,12 @@
   thead th.on.asc::after, thead th.on.asc:hover::after { content: " ▴"; color: var(--accent-deep); }
   tbody tr { border-bottom: 1px solid var(--rule); }
   tbody tr:last-child { border-bottom: none; }
+  tbody tr.bearish { background: rgba(179, 64, 42, 0.16); box-shadow: inset 4px 0 0 var(--puts); }
+  tbody tr.bullish { background: rgba(14, 124, 102, 0.16); box-shadow: inset 4px 0 0 var(--calls); }
+  .legend { font-size: 12.5px; color: var(--ink-soft); margin: -14px 0 16px; }
+  .legend .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+  .legend .sw.p { background: rgba(179, 64, 42, 0.16); border: 1px solid var(--puts); }
+  .legend .sw.c { background: rgba(14, 124, 102, 0.16); border: 1px solid var(--calls); }
   td { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; }
   td.sym { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 15.5px; }
   td.spot span { display: block; font-size: 12.5px; }
@@ -133,6 +139,7 @@
     <button data-view="chain" class="on">Whole chain</button>
     <button data-view="near">Near-term · 0DTE/1DTE</button>
   </div>
+  <p class="legend"><span class="sw p"></span>Bearish (tilt ≤55) &nbsp; <span class="sw c"></span>Bullish (tilt 70–85)</p>
 
   <table>
     <thead><tr>
@@ -199,7 +206,8 @@ function render() {
     const sp = spread(r);
     const chg = r.spot_change_pct;
     const exp = state.view === "near" ? (r.expiry ? r.expiry.slice(5).replace("-","/") : "—") : "all";
-    return `<tr>
+    const rowCls = a.tilt == null ? "" : a.tilt <= 55 ? "bearish" : (a.tilt >= 70 && a.tilt <= 85) ? "bullish" : "";
+    return `<tr class="${rowCls}">
       <td class="sym">${r.symbol}</td>
       <td class="exp">${exp}</td>
       <td class="spot hide-sm">${r.spot?.toFixed(2) ?? "—"}<span class="${chg >= 0 ? "up" : "dn"}">${chg == null ? "" : (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%"}</span></td>
@@ -234,8 +242,14 @@ document.querySelectorAll("#toggle button").forEach(b => {
   });
 });
 
+// Shown only on Thursdays. "Thursday" is the market date the data itself
+// carries (data.generated, converted to ET), not the viewer's local day, so
+// the row set stays consistent regardless of where the page is loaded from.
+const THURSDAY_ONLY = new Set(["IBM", "WMT", "ORCL"]);
+
 function load(data, live) {
-  state.rows = data.rows || [];
+  const marketDay = new Date(data.generated).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short" });
+  state.rows = (data.rows || []).filter(r => !THURSDAY_ONLY.has(r.symbol) || marketDay === "Thu");
   const hasHistory = state.rows.some(r => r.near?.tilt_prev != null || r.chain?.tilt_prev != null);
   document.body.classList.toggle("no-history", !hasHistory);
   if (!hasHistory && state.key === "tilt_prev") { state.key = "tilt"; state.asc = false; }

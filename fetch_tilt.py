@@ -35,6 +35,7 @@ from pathlib import Path
 SYMBOLS = [
     "AAPL", "AMZN", "AVGO", "IBIT", "GOOGL", "META", "MSFT", "NVDA",
     "TSLA", "AMD", "XLF", "INTC", "MU", "SMH", "GLD", "SLV", "TLT",
+    "IBM", "WMT", "ORCL",
 ]
 
 URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
