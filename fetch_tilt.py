@@ -9,10 +9,12 @@ expiry's volume only.
 Tilt = call volume / (call volume + put volume) * 100, nearest expiry only
 
 This is a 0DTE/1DTE service: the same-day expiry is the point, so it is kept,
-not skipped. Run after the close, a Mon/Wed/Fri name scores that day's 0DTE
-(the expiry with the real volume). Set EXPIRY_AFTER_TODAY = True to instead
-skip the same-day expiry and score the next one out (the old behavior, which
-scored near-empty expiries and produced noise on thinly-traded names).
+not skipped, Monday through Thursday. Friday is the one exception: same-day
+is skipped there and the near view rolls to the next expiry (Monday) instead,
+since a Friday-afternoon 0DTE read is stale by the time anyone reads it over
+the weekend. Set EXPIRY_AFTER_TODAY = True to instead skip the same-day expiry
+every day (the old behavior, which scored near-empty expiries and produced
+noise on thinly-traded names).
 
 Run once per day after the close (Cboe delayed data finalizes shortly after
 4:15pm ET); the numbers are read the next morning as the prior session's
@@ -124,7 +126,12 @@ def fetch_symbol(sym: str) -> dict | None:
         return None
 
     data = payload.get("data", {})
-    today = datetime.now(timezone.utc).astimezone().strftime("%y%m%d")
+    now_local = datetime.now(timezone.utc).astimezone()
+    today = now_local.strftime("%y%m%d")
+    # Friday's same-day expiry is the last liquid session before the weekend gap,
+    # so skip it and roll to Monday's instead. Mon-Thu keep 0DTE (Tue/Thu already
+    # roll to Wed/Fri naturally below since those tickers have no Tue/Thu expiry).
+    friday_skip_same_day = now_local.weekday() == 4
 
     # Bucket volume by expiration.
     by_exp: dict[str, list[int]] = {}
@@ -149,10 +156,12 @@ def fetch_symbol(sym: str) -> dict | None:
         print(f"  {sym}: zero session volume (chain just rolled), keeping last good row")
         return EMPTY
 
-    # Near-term: nearest expiry, same-day (0DTE) included unless EXPIRY_AFTER_TODAY,
-    # rolling past dead expiries (e.g. GOOGL's ~40-contract Wednesday) to the first
-    # clearing the floor; if none qualifies, take the heaviest upcoming one.
-    live = sorted(e for e in by_exp if (e > today if EXPIRY_AFTER_TODAY else e >= today))
+    # Near-term: nearest expiry, same-day (0DTE) included unless EXPIRY_AFTER_TODAY
+    # (or it's Friday, see friday_skip_same_day above), rolling past dead expiries
+    # (e.g. GOOGL's ~40-contract Wednesday) to the first clearing the floor; if none
+    # qualifies, take the heaviest upcoming one.
+    exclude_today = EXPIRY_AFTER_TODAY or friday_skip_same_day
+    live = sorted(e for e in by_exp if (e > today if exclude_today else e >= today))
     front = next((e for e in live if sum(by_exp[e]) >= VOLUME_FLOOR), None)
     if front is None and live:
         front = max(live, key=lambda e: sum(by_exp[e]))
@@ -222,7 +231,7 @@ def main() -> int:
 
     out = {
         "generated": now_iso,
-        "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE, rolling past sub-1,000-contract expiries; chain = all expirations",
+        "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE (Mon-Thu; Fridays roll to the next expiry), rolling past sub-1,000-contract expiries; chain = all expirations",
         "rows": rows,
         "failed": failed,
         "empty": empty,
