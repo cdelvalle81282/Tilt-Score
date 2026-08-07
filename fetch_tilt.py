@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SYMBOLS = [
-    "AAPL", "AMZN", "AVGO", "IBIT", "GOOGL", "META", "MSFT", "NVDA",
+    "AAPL", "AMZN", "AVGO", "GOOGL", "META", "MSFT", "NVDA",
     "TSLA", "AMD", "XLF", "INTC", "MU", "SMH", "GLD", "SLV", "TLT",
     "IBM", "WMT", "ORCL",
 ]
