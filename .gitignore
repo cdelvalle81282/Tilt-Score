@@ -11,6 +11,10 @@ tilt-repo.zip
 __pycache__/
 *.pyc
 
+# Derived research data -- rebuilt from tilt.json history + price pulls, not source
+research/tilt_history.db
+research/droplet_tilt.json
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

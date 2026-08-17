@@ -219,7 +219,10 @@ def main() -> int:
         rows.append(row)
 
         hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
-        hist.append({"date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"]})
+        hist.append({
+            "date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"],
+            "near_volume": row["near"]["total"], "chain_volume": row["chain"]["total"],
+        })
         prior_history[sym] = hist[-HISTORY_KEEP:]
 
         # Day-over-day change per view, if we have a previous date.
