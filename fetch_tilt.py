@@ -36,7 +36,7 @@ from pathlib import Path
 
 SYMBOLS = [
     "AAPL", "AMZN", "AVGO", "GOOGL", "META", "MSFT", "NVDA",
-    "TSLA", "AMD", "XLF", "INTC", "MU", "SMH", "GLD", "SLV", "TLT",
+    "TSLA", "AMD", "XLF", "INTC", "MU", "SMH", "GLD", "SLV", "TLT", "SOXL",
     "IBM", "WMT", "ORCL",
 ]
 
