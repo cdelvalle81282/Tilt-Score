@@ -130,9 +130,9 @@ def fetch_symbol(sym: str) -> dict | None:
     now_local = datetime.now(timezone.utc).astimezone()
     today = now_local.strftime("%y%m%d")
     # Friday's same-day expiry is the last liquid session before the weekend gap,
-    # so skip it and roll to Monday's instead. Mon-Thu keep 0DTE. Tickers with only
-    # Mon/Wed/Fri expiries roll to Wed/Fri naturally below on Tue/Thu; the ones that
-    # list every weekday (GLD, SMH, XLF, plus the single names) score same-day all week.
+    # so skip it and roll to Monday's instead. Mon-Thu keep 0DTE. Most tickers only
+    # list Mon/Wed/Fri expiries, so on Tue/Thu they roll to Wed/Fri naturally below;
+    # the ones with an expiry every weekday (GLD, SMH, XLF) score same-day all week.
     friday_skip_same_day = now_local.weekday() == 4
 
     # Bucket volume by expiration.
