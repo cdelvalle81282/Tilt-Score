@@ -1,6 +1,6 @@
 # Tilt Score (Project Next)
 
-0DTE / nearest-expiration call/put tilt for 17 tickers, refreshed **every 15
+0DTE / nearest-expiration call/put tilt for 25 tickers (22 daily + 3 Thursday-only), refreshed **every 15
 minutes during market hours**. Data from Cboe delayed quotes.
 
 The page shows two views, toggled at the top:

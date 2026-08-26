@@ -37,6 +37,7 @@ from pathlib import Path
 SYMBOLS = [
     "AAPL", "AMZN", "AVGO", "GOOGL", "META", "MSFT", "NVDA",
     "TSLA", "AMD", "XLF", "INTC", "MU", "SMH", "GLD", "SLV", "TLT", "SOXL",
+    "EEM", "IBIT", "XLE", "TQQQ", "DRAM",
     "IBM", "WMT", "ORCL",
 ]
 
@@ -129,8 +130,9 @@ def fetch_symbol(sym: str) -> dict | None:
     now_local = datetime.now(timezone.utc).astimezone()
     today = now_local.strftime("%y%m%d")
     # Friday's same-day expiry is the last liquid session before the weekend gap,
-    # so skip it and roll to Monday's instead. Mon-Thu keep 0DTE (Tue/Thu already
-    # roll to Wed/Fri naturally below since those tickers have no Tue/Thu expiry).
+    # so skip it and roll to Monday's instead. Mon-Thu keep 0DTE. Tickers with only
+    # Mon/Wed/Fri expiries roll to Wed/Fri naturally below on Tue/Thu; the ones that
+    # list every weekday (GLD, SMH, XLF, plus the single names) score same-day all week.
     friday_skip_same_day = now_local.weekday() == 4
 
     # Bucket volume by expiration.
