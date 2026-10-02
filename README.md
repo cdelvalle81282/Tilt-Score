@@ -30,6 +30,8 @@ Action below is retired to a manual backup (`workflow_dispatch` only).
   droplet). Carries the per-symbol history that powers the Δ1d column.
 - `fetch_tilt.py`: the fetcher. Stdlib only, no dependencies. `TILT_JSON`,
   `SLACK_WEBHOOK_URL`, `HEALTHCHECK_URL` env vars configure output path + alerts.
+  `TILT_ARCHIVE_DIR` (optional) appends every run to a permanent per-day `.jsonl`
+  file for backtesting; `tilt.json` itself only keeps a rolling 60 days.
 - `.github/workflows/update-tilt.yml`: retired backup workflow (`workflow_dispatch`
   only) that commits `tilt.json` into the repo if run manually.
 

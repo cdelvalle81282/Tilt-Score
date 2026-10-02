@@ -23,7 +23,10 @@ Run once per day after the close (Cboe delayed data finalizes shortly after
   Task Scheduler (Windows): daily 4:20 PM ET, action = python fetch_tilt.py
 
 The script keeps a rolling per-symbol history (last 60 runs, one per date)
-inside tilt.json so the page can show day-over-day change.
+inside tilt.json so the page can show day-over-day change. That window drops
+its oldest day once it is full, so it is not a research record: when
+TILT_ARCHIVE_DIR is set, every run is also appended to a permanent per-day
+file there (see archive_run) for backtesting.
 """
 
 import json
@@ -50,6 +53,9 @@ EXPIRY_AFTER_TODAY = False   # False = keep the same-day 0DTE (this is a 0DTE se
 VOLUME_FLOOR = 1000          # roll past any expiry trading fewer contracts than this
 HISTORY_KEEP = 60
 STALE_MINUTES = 45           # alert only when no symbol has refreshed in this long
+# Permanent research archive, off when unset (local runs write nothing). On the
+# droplet it points outside both the git checkout and the nginx web root.
+ARCHIVE_DIR = os.environ.get("TILT_ARCHIVE_DIR", "").strip()
 
 # Returned when the fetch itself worked but the chain carries no volume yet. Cboe
 # zeroes the session volume when its file rolls to the new session (~9:45am ET),
@@ -113,6 +119,32 @@ def age_minutes(iso: str | None, now: datetime) -> float | None:
     if stamp.tzinfo is None:
         stamp = stamp.replace(tzinfo=timezone.utc)
     return (now - stamp).total_seconds() / 60
+
+
+def archive_run(today: str, now_iso: str, rows: list[dict]) -> None:
+    """Append this run's freshly fetched rows to ARCHIVE_DIR/YYYY-MM-DD.jsonl,
+    one JSON line per run. Never raises: the archive must not break the page.
+
+    Unlike tilt.json's rolling history this is never trimmed, and it keeps every
+    15-min reading (calls, puts, spot, expiry), not just the day's last one, so
+    an intraday reading can be tested against the price later that session.
+    Carried-forward stale rows are left out; a run with nothing fresh writes no
+    line. Readings stamped before ~9:45am ET are still the prior session's totals
+    (see EMPTY above), so a backtest should start each day at the 10:00am ET run.
+    """
+    if not ARCHIVE_DIR:
+        return
+    fresh = [r for r in rows if r.get("updated") == now_iso]
+    if not fresh:
+        return
+    try:
+        folder = Path(ARCHIVE_DIR)
+        folder.mkdir(parents=True, exist_ok=True)
+        line = json.dumps({"generated": now_iso, "rows": fresh}, separators=(",", ":"))
+        with open(folder / f"{today}.jsonl", "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception as e:
+        print(f"  archive write failed: {e}", file=sys.stderr)
 
 
 def fetch_symbol(sym: str) -> dict | None:
@@ -244,6 +276,7 @@ def main() -> int:
     }
     OUT.write_text(json.dumps(out, indent=1))
     print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed, {len(empty)} empty)")
+    archive_run(today, now_iso, rows)
 
     # Health is measured on the data, not on this one run: a cycle where every
     # symbol failed (or came back empty) is harmless as long as the carried-over
