@@ -59,6 +59,12 @@ no-op when its var is unset. On the droplet these live in the job's `.env`.
 - **Partial failures** (some symbols in `failed[]` but the page still updates):
   the run posts its own Slack heads-up naming the symbols. Without this these
   are invisible outside the page footer.
+- **Stale feed** (every fetch succeeds but Cboe is still serving a prior
+  session's volume, as happened all day on 2026-09-23): from 10:15am ET on a
+  trading day the run posts to Slack once that day and pings `/fail` until the
+  feed rolls. One or two stuck symbols get a single heads-up instead. Market
+  holidays are skipped via `MARKET_HOLIDAYS` in `fetch_tilt.py`, which is listed
+  through 2027 and needs extending after that.
 - **Silent stop** (the scheduler/server dies, so no run at all): a successful
   run pings a healthchecks.io check; if a scheduled ping goes missing, that
   service alerts you. Set the check to cron `*/15 13-21 * * 1-5` (UTC) with a

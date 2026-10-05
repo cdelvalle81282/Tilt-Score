@@ -57,6 +57,24 @@ STALE_MINUTES = 45           # alert only when no symbol has refreshed in this l
 # droplet it points outside both the git checkout and the nginx web root.
 ARCHIVE_DIR = os.environ.get("TILT_ARCHIVE_DIR", "").strip()
 
+# Stale-feed check. A fetch can succeed and still hand back the PRIOR session's
+# volume: every morning before Cboe rolls its file (~9:45am ET), all day on a
+# market holiday, and on 2026-09-23 when Cboe served the 09/22 file all session
+# while every run here reported 25 ok. Each row's `session` (see fetch_symbol)
+# says which day its volume was traded on; past FEED_DUE_ET on a trading day it
+# must be today. 10:00am is the first run with real volume, 10:15 leaves one
+# cycle of slack.
+FEED_DUE_ET = (10, 15)
+# Full-day NYSE closures, when the feed correctly stays on the prior session.
+# A date missing from this list costs one false alert that day, so extend it
+# when it runs out.
+MARKET_HOLIDAYS = {
+    "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31",
+    "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+}
+ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
 # Returned when the fetch itself worked but the chain carries no volume yet. Cboe
 # zeroes the session volume when its file rolls to the new session (~9:45am ET),
 # so every symbol comes back empty for exactly one 15-min cycle each morning.
@@ -121,6 +139,17 @@ def age_minutes(iso: str | None, now: datetime) -> float | None:
     return (now - stamp).total_seconds() / 60
 
 
+def market_now(now: datetime) -> datetime | None:
+    """`now` in New York time, or None when this Python has no tz database
+    (stock Windows without the tzdata package). The stale-feed check is skipped
+    then; the droplet always has one."""
+    try:
+        from zoneinfo import ZoneInfo
+        return now.astimezone(ZoneInfo("America/New_York"))
+    except Exception:
+        return None
+
+
 def archive_run(today: str, now_iso: str, rows: list[dict]) -> None:
     """Append this run's freshly fetched rows to ARCHIVE_DIR/YYYY-MM-DD.jsonl,
     one JSON line per run. Never raises: the archive must not break the page.
@@ -167,8 +196,14 @@ def fetch_symbol(sym: str) -> dict | None:
     # the ones with an expiry every weekday (GLD, SMH, XLF) score same-day all week.
     friday_skip_same_day = now_local.weekday() == 4
 
-    # Bucket volume by expiration.
+    # Bucket volume by expiration. `session` is the day that volume was traded:
+    # a contract's volume and its last_trade_time move together (a contract not
+    # traded this session keeps an older date and shows zero volume), so the
+    # newest trade date among contracts carrying volume is the session the file
+    # is on. The underlying's own last_trade_time is no use here, it ticks in
+    # the pre-market while the option volume is still yesterday's.
     by_exp: dict[str, list[int]] = {}
+    session = ""
     for o in data.get("options", []):
         m = OCC.match(o.get("option", ""))
         if not m:
@@ -177,6 +212,10 @@ def fetch_symbol(sym: str) -> dict | None:
         v = int(o.get("volume") or 0)
         bucket = by_exp.setdefault(exp, [0, 0])
         bucket[0 if cp == "C" else 1] += v
+        if v:
+            day = ISO_DAY.match(str(o.get("last_trade_time") or ""))
+            if day and day.group() > session:
+                session = day.group()
 
     if not by_exp:
         print(f"  {sym}: no contracts in the payload, keeping last good row")
@@ -214,6 +253,7 @@ def fetch_symbol(sym: str) -> dict | None:
         "spot": data.get("current_price"),
         "spot_change_pct": data.get("price_change_percent"),
         "expiry": expiry,
+        "session": session or None,
         "near": near,
         "chain": {"calls": calls_all, "puts": puts_all, "total": total_all,
                   "tilt": round(calls_all / total_all * 100, 1)},
@@ -224,18 +264,24 @@ def main() -> int:
     # Load prior file so history and last-known-good rows carry forward.
     prior_history: dict[str, list] = {}
     prior_rows: dict[str, dict] = {}
+    prior_alert: dict = {}
     if OUT.exists():
         try:
             prior = json.loads(OUT.read_text())
             prior_history = prior.get("history", {})
             prior_rows = {r["symbol"]: r for r in prior.get("rows", [])}
+            prior_alert = prior.get("feed_alert") or {}
         except Exception:
             pass
 
-    today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
     now_dt = datetime.now(timezone.utc)
+    today = now_dt.astimezone().strftime("%Y-%m-%d")
     now_iso = now_dt.isoformat(timespec="seconds")
-    rows, failed, empty = [], [], []
+    # The trading day in New York, which is what a row's `session` is compared
+    # against. Falls back to the local date when there is no tz database.
+    now_et = market_now(now_dt)
+    market_day = now_et.strftime("%Y-%m-%d") if now_et else today
+    rows, failed, empty, behind, fetched = [], [], [], [], []
     for sym in SYMBOLS:
         row = fetch_symbol(sym)
         if row is None or row is EMPTY:
@@ -251,20 +297,50 @@ def main() -> int:
             continue
         row["updated"] = now_iso
         rows.append(row)
+        fetched.append(row)
 
-        hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
-        hist.append({
-            "date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"],
-            "near_volume": row["near"]["total"], "chain_volume": row["chain"]["total"],
-        })
-        prior_history[sym] = hist[-HISTORY_KEEP:]
+        # A row still on an earlier session's volume is shown as-is (it is the
+        # latest there is) but must not be written into history under today's
+        # date: that is how the 09/23 duplicates and the Labor Day ghost row got
+        # in. An unknown session (no trade times in the payload) is let through.
+        on_prior_session = bool(row["session"]) and row["session"] < market_day
+        if on_prior_session:
+            behind.append(sym)
+        else:
+            hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
+            hist.append({
+                "date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"],
+                "near_volume": row["near"]["total"], "chain_volume": row["chain"]["total"],
+            })
+            prior_history[sym] = hist[-HISTORY_KEEP:]
 
         # Day-over-day change per view, if we have a previous date.
-        prev = [h for h in prior_history[sym] if h["date"] != today]
+        prev = [h for h in prior_history.get(sym, []) if h["date"] != today]
         p = prev[-1] if prev else {}
         row["near"]["tilt_prev"] = p.get("near", p.get("tilt"))   # old entries stored "tilt"
         row["chain"]["tilt_prev"] = p.get("chain")
-        print(f"  {sym}: near {row['near']['tilt']} / chain {row['chain']['tilt']}")
+        print(f"  {sym}: near {row['near']['tilt']} / chain {row['chain']['tilt']}"
+              + (f" (still {row['session']} volume)" if on_prior_session else ""))
+
+    # Stale feed: past FEED_DUE_ET on a trading day, any row still on a prior
+    # session is a problem. Before that time, and on weekends and holidays, it
+    # is simply what the feed is supposed to look like.
+    feed_due = (now_et is not None and now_et.weekday() < 5
+                and market_day not in MARKET_HOLIDAYS
+                and (now_et.hour, now_et.minute) >= FEED_DUE_ET)
+    stale_feed = behind if feed_due else []
+    feed_down = len(stale_feed) > len(SYMBOLS) / 2
+    # Can't check anything if no fetched row could be dated (Cboe changed its payload).
+    blind = feed_due and bool(fetched) and not any(r["session"] for r in fetched)
+    # One Slack post per day per symbol, not one per 15-min run: `feed_alert`
+    # rides along in tilt.json so the next run knows what was already reported.
+    feed_alert = prior_alert if prior_alert.get("date") == market_day else {}
+    feed_alert = {"date": market_day, "symbols": list(feed_alert.get("symbols", [])),
+                  "blind": bool(feed_alert.get("blind"))}
+    new_stale = [s for s in stale_feed if s not in feed_alert["symbols"]]
+    new_blind = blind and not feed_alert["blind"]
+    feed_alert["symbols"] += new_stale
+    feed_alert["blind"] = feed_alert["blind"] or blind
 
     out = {
         "generated": now_iso,
@@ -272,11 +348,36 @@ def main() -> int:
         "rows": rows,
         "failed": failed,
         "empty": empty,
+        "behind": behind,
+        "feed_alert": feed_alert,
         "history": prior_history,
     }
     OUT.write_text(json.dumps(out, indent=1))
-    print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed, {len(empty)} empty)")
+    print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed, {len(empty)} empty, "
+          f"{len(behind)} on a prior session)")
     archive_run(today, now_iso, rows)
+
+    if new_stale:
+        link = run_url()
+        days = ", ".join(sorted({r["session"] for r in fetched if r["symbol"] in stale_feed}))
+        if feed_down:
+            msg = (f":rotating_light: Tilt Score: the Cboe feed has not rolled to today's "
+                   f"session. {len(stale_feed)} of {len(SYMBOLS)} symbols are still on {days} "
+                   f"volume at {now_et:%H:%M} ET, so the page is showing a prior session's "
+                   f"numbers as current. If today is a market holiday, add it to "
+                   f"MARKET_HOLIDAYS in fetch_tilt.py.")
+        else:
+            msg = (f":warning: Tilt Score: {', '.join(stale_feed)} still on {days} volume at "
+                   f"{now_et:%H:%M} ET ({len(stale_feed)} of {len(SYMBOLS)} symbols). "
+                   f"The rest are current.")
+        notify_slack(msg + (f"\n{link}" if link else ""))
+        print(msg, file=sys.stderr)
+    if new_blind:
+        msg = (":warning: Tilt Score: the stale-feed check is off. The Cboe payload no longer "
+               "carries option trade times, so fetch_tilt.py cannot tell which session the "
+               "volume belongs to.")
+        notify_slack(msg)
+        print(msg, file=sys.stderr)
 
     # Health is measured on the data, not on this one run: a cycle where every
     # symbol failed (or came back empty) is harmless as long as the carried-over
@@ -308,7 +409,9 @@ def main() -> int:
         notify_slack(msg + (f"\n{link}" if link else ""))
         print(msg, file=sys.stderr)
 
-    return 0 if healthy else 1
+    # A feed stuck on a prior session keeps `updated` advancing, so it would pass
+    # the freshness test above. Fail the run on it too, so __main__ pings /fail.
+    return 0 if healthy and not feed_down else 1
 
 
 if __name__ == "__main__":
