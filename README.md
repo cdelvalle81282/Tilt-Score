@@ -75,9 +75,10 @@ no-op when its var is unset. On the droplet these live in the job's `.env`.
   gaining 1,000+ contracts since the previous run with day volume above open
   interest and $2M+ notional, or one expiry reaching 3,000+ puts, half its put
   open interest and 70%+ of its volume. Each strike or expiry posts once per
-  session. Goes to `FLOW_SLACK_WEBHOOK_URL`, or the main webhook when unset.
-  Thresholds are the `FLOW_*` constants in `fetch_tilt.py`. This is volume,
-  not confirmed buying: the Cboe feed has no trade-by-trade data.
+  session. Hits are always written to the job log; they post to Slack only when
+  `FLOW_POST=1` is set, to `FLOW_SLACK_WEBHOOK_URL` or the main webhook when
+  that is unset. Thresholds are the `FLOW_*` constants in `fetch_tilt.py`. This
+  is volume, not confirmed buying: the Cboe feed has no trade-by-trade data.
 - **Silent stop** (the scheduler/server dies, so no run at all): a successful
   run pings a healthchecks.io check; if a scheduled ping goes missing, that
   service alerts you. Set the check to cron `*/15 13-21 * * 1-5` (UTC) with a

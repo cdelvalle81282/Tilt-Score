@@ -90,8 +90,11 @@ ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 #           hits by noon across the 25 names; a flat 1,000-contract rule would
 #           have fired 96 times.
 # Each key fires once per session; per-contract volumes from the previous run
-# live in FLOW_STATE. Posts go to FLOW_SLACK_WEBHOOK_URL, or SLACK_WEBHOOK_URL
-# when that is unset.
+# live in FLOW_STATE. Hits are always logged (journal) and archived; they are
+# posted to Slack only when FLOW_POST=1, to FLOW_SLACK_WEBHOOK_URL or, when that
+# is unset, SLACK_WEBHOOK_URL. Posting was switched off 2026-10-07 at the user's
+# request, pending threshold tuning.
+FLOW_POST = os.environ.get("FLOW_POST", "").strip() == "1"
 FLOW_MIN_DTE = 14
 FLOW_BLOCK_CONTRACTS = 1000
 FLOW_BLOCK_NOTIONAL = 2_000_000
@@ -396,8 +399,9 @@ def flow_run(flows: dict[str, dict], market_day: str, when: str) -> None:
             print(f"  flow archive write failed: {e}", file=sys.stderr)
     if lines:
         msg = ":large_blue_circle: Put flow (volume, not confirmed buys):\n" + "\n".join(lines)
-        notify_slack(msg, FLOW_WEBHOOK)
-        print(msg)
+        if FLOW_POST:
+            notify_slack(msg, FLOW_WEBHOOK)
+        print(msg if FLOW_POST else msg.replace("Put flow", "Put flow (logged, not posted)", 1))
 
 
 def main() -> int:
