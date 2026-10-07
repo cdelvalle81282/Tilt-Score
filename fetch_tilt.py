@@ -34,7 +34,7 @@ import os
 import re
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SYMBOLS = [
@@ -48,7 +48,7 @@ URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
 # Output path defaults next to the script (GitHub Pages layout); on the droplet
 # TILT_JSON points at the nginx-served data dir, outside the git checkout.
 OUT = Path(os.environ.get("TILT_JSON") or (Path(__file__).resolve().parent / "tilt.json"))
-OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])\d{8}$")
+OCC = re.compile(r"^[A-Z.^]+(\d{6})([CP])(\d{8})$")
 EXPIRY_AFTER_TODAY = False   # False = keep the same-day 0DTE (this is a 0DTE service)
 VOLUME_FLOOR = 1000          # roll past any expiry trading fewer contracts than this
 HISTORY_KEEP = 60
@@ -74,6 +74,34 @@ MARKET_HOLIDAYS = {
     "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
 }
 ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+# Put-flow alerts (added 2026-10-07): "heavy put buying in the Dec and Jan
+# expiries" on a tracked name. The feed only carries each contract's running
+# volume, so this is "a lot of puts traded", not "someone bought puts". Two
+# rules, both limited to expiries FLOW_MIN_DTE+ days out (near-dated strikes on
+# the big names put up 1,000 contracts every 15 minutes, far-dated ones do not):
+#   block:  one put strike gained FLOW_BLOCK_CONTRACTS+ since the previous run,
+#           its day volume exceeds its open interest (new positions, not a
+#           close-out), and the day's volume is worth FLOW_BLOCK_NOTIONAL+.
+#   expiry: one expiry's puts reach FLOW_EXPIRY_CONTRACTS, at least
+#           FLOW_EXPIRY_OI_RATIO of that expiry's put open interest, and
+#           FLOW_EXPIRY_PUT_SHARE% of its volume (put-driven, not a straddle
+#           or a roll). Calibrated 2026-10-07: 2 expiry hits and about 10 block
+#           hits by noon across the 25 names; a flat 1,000-contract rule would
+#           have fired 96 times.
+# Each key fires once per session; per-contract volumes from the previous run
+# live in FLOW_STATE. Posts go to FLOW_SLACK_WEBHOOK_URL, or SLACK_WEBHOOK_URL
+# when that is unset.
+FLOW_MIN_DTE = 14
+FLOW_BLOCK_CONTRACTS = 1000
+FLOW_BLOCK_NOTIONAL = 2_000_000
+FLOW_EXPIRY_CONTRACTS = 3000
+FLOW_EXPIRY_OI_RATIO = 0.5
+FLOW_EXPIRY_PUT_SHARE = 70
+FLOW_STATE = Path(os.environ.get("TILT_FLOW_STATE") or (
+    Path(ARCHIVE_DIR) / "flow_state.json" if ARCHIVE_DIR
+    else Path(__file__).resolve().parent / "flow_state.json"))
+FLOW_WEBHOOK = os.environ.get("FLOW_SLACK_WEBHOOK_URL", "").strip()
 
 # Returned when the fetch itself worked but the chain carries no volume yet. Cboe
 # zeroes the session volume when its file rolls to the new session (~9:45am ET),
@@ -111,12 +139,13 @@ def run_url() -> str:
     return f"{server}/{repo}/actions/runs/{run_id}" if server and repo and run_id else ""
 
 
-def notify_slack(text: str) -> None:
+def notify_slack(text: str, webhook: str = "") -> None:
     """Best-effort Slack post. Never raises: a broken alert must not fail the run."""
-    if not SLACK_WEBHOOK:
+    webhook = webhook or SLACK_WEBHOOK
+    if not webhook:
         return
     req = urllib.request.Request(
-        SLACK_WEBHOOK,
+        webhook,
         data=json.dumps({"text": text}).encode(),
         headers={"Content-Type": "application/json"},
     )
@@ -204,18 +233,36 @@ def fetch_symbol(sym: str) -> dict | None:
     # the pre-market while the option volume is still yesterday's.
     by_exp: dict[str, list[int]] = {}
     session = ""
+    # Side channel for the put-flow check (see FLOW_* above): every expiry's
+    # volume and open interest by side, plus each far-dated put that traded.
+    # Stripped from the row before it is written, so none of it is public.
+    exp_flow: dict[str, dict] = {}
+    far_puts: list[dict] = []
+    far_cutoff = (now_local + timedelta(days=FLOW_MIN_DTE)).strftime("%y%m%d")
     for o in data.get("options", []):
         m = OCC.match(o.get("option", ""))
         if not m:
             continue
         exp, cp = m.group(1), m.group(2)
         v = int(o.get("volume") or 0)
+        oi = int(o.get("open_interest") or 0)
         bucket = by_exp.setdefault(exp, [0, 0])
         bucket[0 if cp == "C" else 1] += v
+        ef = exp_flow.setdefault(f"20{exp[:2]}-{exp[2:4]}-{exp[4:]}",
+                                 {"calls": 0, "puts": 0, "call_oi": 0, "put_oi": 0})
+        ef["calls" if cp == "C" else "puts"] += v
+        ef["call_oi" if cp == "C" else "put_oi"] += oi
         if v:
             day = ISO_DAY.match(str(o.get("last_trade_time") or ""))
             if day and day.group() > session:
                 session = day.group()
+            if cp == "P" and exp >= far_cutoff:
+                far_puts.append({
+                    "occ": m.group(0), "exp": f"20{exp[:2]}-{exp[2:4]}-{exp[4:]}",
+                    "strike": int(m.group(3)) / 1000, "vol": v, "oi": oi,
+                    "last": float(o.get("last_trade_price") or 0),
+                    "bid": float(o.get("bid") or 0), "ask": float(o.get("ask") or 0),
+                })
 
     if not by_exp:
         print(f"  {sym}: no contracts in the payload, keeping last good row")
@@ -257,7 +304,100 @@ def fetch_symbol(sym: str) -> dict | None:
         "near": near,
         "chain": {"calls": calls_all, "puts": puts_all, "total": total_all,
                   "tilt": round(calls_all / total_all * 100, 1)},
+        "_flow": {"exp": exp_flow, "puts": far_puts},
     }
+
+
+def fmt_expiry(iso: str) -> str:
+    d = datetime.strptime(iso, "%Y-%m-%d")
+    return f"{d:%b} {d.day}"
+
+
+def fmt_strike(k: float) -> str:
+    return f"{k:g}"
+
+
+def trade_side(p: dict) -> str:
+    """Where the last print sat against the quote. One print standing in for the
+    whole day, so a hint only."""
+    if p["last"] <= 0 or p["ask"] <= 0:
+        return ""
+    if p["last"] >= p["ask"]:
+        return "last print at the ask"
+    if p["last"] <= p["bid"]:
+        return "last print at the bid"
+    return "last print between the quotes"
+
+
+def flow_run(flows: dict[str, dict], market_day: str, when: str) -> None:
+    """Put-flow alerts for this run (see FLOW_* above), one Slack post per run
+    listing every new hit. `flows` holds the `_flow` side channel of each row
+    fetched fresh and on today's session. Best-effort: never raises."""
+    if not flows:
+        return
+    try:
+        state = json.loads(FLOW_STATE.read_text()) if FLOW_STATE.exists() else {}
+    except Exception:
+        state = {}
+    if state.get("date") != market_day:
+        state = {"date": market_day, "last": {}, "fired": []}
+    fired = set(state["fired"])
+    far_from = (datetime.strptime(market_day, "%Y-%m-%d") + timedelta(days=FLOW_MIN_DTE)).strftime("%Y-%m-%d")
+    lines = []
+    for sym, flow in flows.items():
+        last = state["last"].get(sym, {})
+        cur = {}
+        for p in flow["puts"]:
+            cur[p["occ"]] = p["vol"]
+            price = p["last"] if p["last"] > 0 else (p["bid"] + p["ask"]) / 2
+            notional = p["vol"] * price * 100
+            jump = p["vol"] - last.get(p["occ"], 0)
+            key = f"{sym}|{p['exp']}|{p['strike']}"
+            if (jump >= FLOW_BLOCK_CONTRACTS and p["vol"] > p["oi"]
+                    and notional >= FLOW_BLOCK_NOTIONAL and key not in fired):
+                fired.add(key)
+                side = trade_side(p)
+                lines.append(
+                    f"*{sym} {fmt_expiry(p['exp'])} {fmt_strike(p['strike'])}P*: +{jump:,} contracts "
+                    f"since the last check, {p['vol']:,} on the day vs {p['oi']:,} open interest, "
+                    f"last ${price:.2f} (~${notional / 1e6:.1f}M)" + (f", {side}" if side else "") + ".")
+        state["last"][sym] = cur
+        for exp, e in flow["exp"].items():
+            if exp < far_from or not e["put_oi"]:
+                continue
+            tot = e["calls"] + e["puts"]
+            share = e["puts"] / tot * 100 if tot else 0
+            key = f"{sym}|{exp}"
+            if (e["puts"] >= FLOW_EXPIRY_CONTRACTS and e["puts"] >= FLOW_EXPIRY_OI_RATIO * e["put_oi"]
+                    and share >= FLOW_EXPIRY_PUT_SHARE and key not in fired):
+                fired.add(key)
+                top = sorted((p for p in flow["puts"] if p["exp"] == exp), key=lambda p: -p["vol"])[:3]
+                tops = ", ".join(f"{fmt_strike(p['strike'])}P {p['vol']:,}" for p in top)
+                lines.append(
+                    f"*{sym} {fmt_expiry(exp)} expiry*: {e['puts']:,} puts today, "
+                    f"{e['puts'] / e['put_oi']:.1f}x the open interest, {share:.0f}% of the expiry's "
+                    f"volume. Top strikes: {tops}.")
+    state["fired"] = sorted(fired)
+    try:
+        FLOW_STATE.parent.mkdir(parents=True, exist_ok=True)
+        FLOW_STATE.write_text(json.dumps(state, separators=(",", ":")))
+    except Exception as e:
+        print(f"  flow state write failed: {e}", file=sys.stderr)
+    # Per-expiry daily totals, overwritten each run so the file ends the day with
+    # the close. Baseline material for "unusual vs this expiry's normal" later.
+    if ARCHIVE_DIR:
+        try:
+            folder = Path(ARCHIVE_DIR) / "flow"
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / f"{market_day}.json").write_text(json.dumps(
+                {"generated": when, "expiries": {s: f["exp"] for s, f in flows.items()}},
+                separators=(",", ":")))
+        except Exception as e:
+            print(f"  flow archive write failed: {e}", file=sys.stderr)
+    if lines:
+        msg = ":large_blue_circle: Put flow (volume, not confirmed buys):\n" + "\n".join(lines)
+        notify_slack(msg, FLOW_WEBHOOK)
+        print(msg)
 
 
 def main() -> int:
@@ -282,6 +422,7 @@ def main() -> int:
     now_et = market_now(now_dt)
     market_day = now_et.strftime("%Y-%m-%d") if now_et else today
     rows, failed, empty, behind, fetched = [], [], [], [], []
+    flows: dict[str, dict] = {}
     for sym in SYMBOLS:
         row = fetch_symbol(sym)
         if row is None or row is EMPTY:
@@ -295,6 +436,7 @@ def main() -> int:
             if stale is not None:
                 rows.append(stale)
             continue
+        flow = row.pop("_flow", None)
         row["updated"] = now_iso
         rows.append(row)
         fetched.append(row)
@@ -307,6 +449,8 @@ def main() -> int:
         if on_prior_session:
             behind.append(sym)
         else:
+            if flow:
+                flows[sym] = flow
             hist = [h for h in prior_history.get(sym, []) if h["date"] != today]
             hist.append({
                 "date": today, "near": row["near"]["tilt"], "chain": row["chain"]["tilt"],
@@ -356,6 +500,7 @@ def main() -> int:
     print(f"Wrote {OUT} ({len(rows)} symbols, {len(failed)} failed, {len(empty)} empty, "
           f"{len(behind)} on a prior session)")
     archive_run(today, now_iso, rows)
+    flow_run(flows, market_day, now_iso)
 
     if new_stale:
         link = run_url()
