@@ -34,6 +34,11 @@ Action below is retired to a manual backup (`workflow_dispatch` only).
   file for backtesting; `tilt.json` itself only keeps a rolling 60 days.
 - `.github/workflows/update-tilt.yml`: retired backup workflow (`workflow_dispatch`
   only) that commits `tilt.json` into the repo if run manually.
+- `call_tilt.html`: the **Call Tilt** page, a separate private view (not linked from
+  the public page). Reads the same `tilt.json`; the score is today's call volume as a
+  multiple of the ticker's normal (median of its last 8 same-weekday sessions,
+  computed in the browser from `history`). Served from the droplet behind Basic Auth
+  at `/call/`, not from GitHub Pages.
 
 ## Setup (one time)
 
