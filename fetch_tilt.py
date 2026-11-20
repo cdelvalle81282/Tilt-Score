@@ -44,7 +44,14 @@ SYMBOLS = [
     "IBM", "WMT", "ORCL",
 ]
 
-URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
+# Data source. Cboe moved this feed behind Cloudflare on 2026-11-20 (cdn.cboe.com
+# now 307s to cdn-api.cboe.com, which 403s scripted clients), so Polygon is the
+# live source whenever POLYGON_API_KEY is set. Cboe stays as the keyless fallback
+# for local runs, in case they reopen it.
+URL = "https://cdn-api.cboe.com/api/global/delayed_quotes/options/{sym}.json"
+POLYGON_KEY = os.environ.get("POLYGON_API_KEY", "").strip()
+POLYGON_BASE = os.environ.get("POLYGON_BASE", "https://api.polygon.io").rstrip("/")
+SOURCE = "polygon" if POLYGON_KEY else "cboe"
 # Output path defaults next to the script (GitHub Pages layout); on the droplet
 # TILT_JSON points at the nginx-served data dir, outside the git checkout.
 OUT = Path(os.environ.get("TILT_JSON") or (Path(__file__).resolve().parent / "tilt.json"))
@@ -208,13 +215,70 @@ def archive_run(today: str, now_iso: str, rows: list[dict]) -> None:
         print(f"  archive write failed: {e}", file=sys.stderr)
 
 
-def fetch_symbol(sym: str) -> dict | None:
-    req = urllib.request.Request(
-        URL.format(sym=sym), headers={"User-Agent": "tilt-score/1.0"}
-    )
+def get_json(url: str, headers: dict | None = None) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "tilt-score/1.0", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def ns_to_et(ns) -> str:
+    """Polygon nanosecond epoch -> 'YYYY-MM-DDTHH:MM:SS' in New York time (the
+    same shape as Cboe's last_trade_time, which is what `session` is read from)."""
+    if not ns:
+        return ""
+    dt = datetime.fromtimestamp(int(ns) / 1e9, timezone.utc)
+    et = market_now(dt) or dt
+    return et.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def fetch_polygon(sym: str) -> dict:
+    """Pull the whole option chain snapshot from Polygon and reshape it into the
+    Cboe payload layout fetch_symbol parses: {data: {current_price,
+    price_change_percent, options: [{option: <OCC>, volume, open_interest,
+    last_trade_time, last_trade_price, bid, ask}]}}. Raises on a failed page."""
+    auth = {"Authorization": f"Bearer {POLYGON_KEY}"}
+    url = f"{POLYGON_BASE}/v3/snapshot/options/{sym}?limit=250"
+    options, spot = [], None
+    while url:
+        page = get_json(url, auth)
+        for c in page.get("results") or []:
+            occ = str(c.get("details", {}).get("ticker") or "").removeprefix("O:")
+            day = c.get("day") or {}
+            quote = c.get("last_quote") or {}
+            trade = c.get("last_trade") or {}
+            vol = int(day.get("volume") or 0)
+            options.append({
+                "option": occ,
+                "volume": vol,
+                "open_interest": int(c.get("open_interest") or 0),
+                # day.last_updated is when the day bar last changed, i.e. the
+                # session the volume belongs to; fall back to the last trade.
+                "last_trade_time": ns_to_et(day.get("last_updated") or trade.get("sip_timestamp")),
+                "last_trade_price": trade.get("price") or day.get("close") or 0,
+                "bid": quote.get("bid") or 0,
+                "ask": quote.get("ask") or 0,
+            })
+            if spot is None:
+                spot = (c.get("underlying_asset") or {}).get("price")
+        url = page.get("next_url") or ""
+    change = None
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            payload = json.load(r)
+        t = get_json(f"{POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers/{sym}",
+                     auth).get("ticker") or {}
+        change = t.get("todaysChangePerc")
+        if spot is None:
+            spot = (t.get("lastTrade") or {}).get("p") or (t.get("day") or {}).get("c") or None
+    except Exception as e:   # spot is cosmetic, never fail the symbol on it
+        print(f"  {sym}: stock snapshot failed ({e})", file=sys.stderr)
+    return {"data": {"current_price": spot, "price_change_percent": change, "options": options}}
+
+
+def fetch_symbol(sym: str) -> dict | None:
+    try:
+        if SOURCE == "polygon":
+            payload = fetch_polygon(sym)
+        else:
+            payload = get_json(URL.format(sym=sym))
     except Exception as e:
         print(f"  {sym}: FAILED ({e})", file=sys.stderr)
         return None
@@ -409,12 +473,14 @@ def main() -> int:
     prior_history: dict[str, list] = {}
     prior_rows: dict[str, dict] = {}
     prior_alert: dict = {}
+    prior_stale: dict = {}
     if OUT.exists():
         try:
             prior = json.loads(OUT.read_text())
             prior_history = prior.get("history", {})
             prior_rows = {r["symbol"]: r for r in prior.get("rows", [])}
             prior_alert = prior.get("feed_alert") or {}
+            prior_stale = prior.get("stale_alert") or {}
         except Exception:
             pass
 
@@ -490,14 +556,37 @@ def main() -> int:
     feed_alert["symbols"] += new_stale
     feed_alert["blind"] = feed_alert["blind"] or blind
 
+    # Health is measured on the data, not on this one run: a cycle where every
+    # symbol failed (or came back empty) is harmless as long as the carried-over
+    # rows are recent. `freshest` is the age of the most recently updated row, so
+    # a real outage trips the alert once the whole table has gone stale.
+    ages = [a for a in (age_minutes(r.get("updated"), now_dt) for r in rows) if a is not None]
+    freshest = min(ages) if ages else None
+    healthy = freshest is not None and freshest <= STALE_MINUTES
+    # Stale-data Slack throttle: one post when the table goes stale, at most one
+    # reminder per market day while it stays stale, one post when it recovers.
+    # (2026-11-20: a Cboe lockout posted every 15 min all morning.) The run still
+    # returns 1 every stale cycle, so healthchecks.io sees each one.
+    stale_post = not healthy and prior_stale.get("date") != market_day
+    recovered = healthy and bool(prior_stale)
+    if healthy:
+        stale_alert = {}
+    elif stale_post:
+        stale_alert = {"date": market_day, "since": prior_stale.get("since") or now_iso}
+    else:
+        stale_alert = prior_stale
+
+    src = ("Polygon option chain snapshot" if SOURCE == "polygon"
+           else "Cboe delayed quotes (15-min delay)")
     out = {
         "generated": now_iso,
-        "source": "Cboe delayed quotes (15-min delay; intraday values are partial-day). near = nearest expiration incl. same-day 0DTE (Mon-Thu; Fridays roll to the next expiry), rolling past sub-1,000-contract expiries; chain = all expirations",
+        "source": src + " (intraday values are partial-day). near = nearest expiration incl. same-day 0DTE (Mon-Thu; Fridays roll to the next expiry), rolling past sub-1,000-contract expiries; chain = all expirations",
         "rows": rows,
         "failed": failed,
         "empty": empty,
         "behind": behind,
         "feed_alert": feed_alert,
+        "stale_alert": stale_alert,
         "history": prior_history,
     }
     OUT.write_text(json.dumps(out, indent=1))
@@ -528,14 +617,6 @@ def main() -> int:
         notify_slack(msg)
         print(msg, file=sys.stderr)
 
-    # Health is measured on the data, not on this one run: a cycle where every
-    # symbol failed (or came back empty) is harmless as long as the carried-over
-    # rows are recent. `freshest` is the age of the most recently updated row, so
-    # a real outage trips the alert once the whole table has gone stale.
-    ages = [a for a in (age_minutes(r.get("updated"), now_dt) for r in rows) if a is not None]
-    freshest = min(ages) if ages else None
-    healthy = freshest is not None and freshest <= STALE_MINUTES
-
     # Partial failure: the file still wrote and the job exits 0, so nobody sees
     # it unless we say so. A run where *every* symbol failed says nothing here -
     # one bad cycle carries forward harmlessly, and if it keeps up, the staleness
@@ -555,8 +636,13 @@ def main() -> int:
         ) if x)
         msg = (f":rotating_light: Tilt Score data is stale: no symbol has updated "
                f"{age}." + (f" ({detail})" if detail else ""))
-        notify_slack(msg + (f"\n{link}" if link else ""))
+        if stale_post:
+            notify_slack(msg + "\nNo more stale posts today unless it recovers and breaks again."
+                         + (f"\n{link}" if link else ""))
         print(msg, file=sys.stderr)
+    if recovered:
+        notify_slack(f":white_check_mark: Tilt Score data is updating again "
+                     f"(stale since {prior_stale.get('since', '?')}).")
 
     # A feed stuck on a prior session keeps `updated` advancing, so it would pass
     # the freshness test above. Fail the run on it too, so __main__ pings /fail.
